@@ -31,5 +31,9 @@ async def get_db() -> AsyncSession:
 
 async def init_db():
     """初始化数据库"""
+    # 导入所有模型以确保它们被注册
+    from app.models.companion import Companion, Message
+    from app.models.chat_session import ChatSession, ChatMessage
+    
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

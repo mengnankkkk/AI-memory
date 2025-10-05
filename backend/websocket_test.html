@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket 流式聊天测试</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .connected { background-color: #d4edda; color: #155724; }
+        .disconnected { background-color: #f8d7da; color: #721c24; }
+        .connecting { background-color: #fff3cd; color: #856404; }
+        .messages {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin: 10px 0;
+            background-color: #fafafa;
+        }
+        .message {
+            margin: 10px 0;
+            padding: 8px 12px;
+            border-radius: 5px;
+            max-width: 70%;
+        }
+        .user { background-color: #007bff; color: white; margin-left: auto; }
+        .assistant { background-color: #e9ecef; color: #333; }
+        .streaming { 
+            background-color: #fff3cd; 
+            color: #856404;
+            border-left: 3px solid #ffc107;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        input, button {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        input {
+            flex: 1;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 AI灵魂伙伴 - WebSocket 流式聊天测试</h1>
+        
+        <div id="status" class="status disconnected">
+            ❌ 未连接
+        </div>
+        
+        <div class="controls">
+            <input type="number" id="companionId" placeholder="伙伴ID (例如: 8)" value="8">
+            <input type="text" id="userId" placeholder="用户ID" value="test_user_123">
+            <button onclick="connectWebSocket()">连接</button>
+            <button onclick="disconnectWebSocket()">断开</button>
+        </div>
+        
+        <div class="controls">
+            <input type="text" id="messageInput" placeholder="输入消息..." disabled>
+            <button onclick="sendMessage()" id="sendBtn" disabled>发送</button>
+        </div>
+        
+        <div id="messages" class="messages"></div>
+        
+        <div>
+            <h3>📊 连接信息</h3>
+            <ul>
+                <li>WebSocket 地址: <code>http://localhost:8000</code></li>
+                <li>当前状态: <span id="connectionInfo">未连接</span></li>
+                <li>消息计数: <span id="messageCount">0</span></li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        let socket = null;
+        let messageCount = 0;
+        let currentStreamingMessage = null;
+
+        function updateStatus(status, message) {
+            const statusEl = document.getElementById('status');
+            const infoEl = document.getElementById('connectionInfo');
+            
+            statusEl.className = `status ${status}`;
+            statusEl.textContent = message;
+            infoEl.textContent = message;
+            
+            const messageInput = document.getElementById('messageInput');
+            const sendBtn = document.getElementById('sendBtn');
+            
+            if (status === 'connected') {
+                messageInput.disabled = false;
+                sendBtn.disabled = false;
+            } else {
+                messageInput.disabled = true;
+                sendBtn.disabled = true;
+            }
+        }
+
+        function addMessage(role, content, isStreaming = false) {
+            const messagesEl = document.getElementById('messages');
+            const messageEl = document.createElement('div');
+            messageEl.className = `message ${role}`;
+            
+            if (isStreaming) {
+                messageEl.className += ' streaming';
+                messageEl.id = 'streaming-message';
+            }
+            
+            messageEl.textContent = content;
+            messagesEl.appendChild(messageEl);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+            
+            messageCount++;
+            document.getElementById('messageCount').textContent = messageCount;
+            
+            return messageEl;
+        }
+
+        function updateStreamingMessage(content) {
+            const streamingEl = document.getElementById('streaming-message');
+            if (streamingEl) {
+                streamingEl.textContent = content;
+            }
+        }
+
+        function finalizeStreamingMessage() {
+            const streamingEl = document.getElementById('streaming-message');
+            if (streamingEl) {
+                streamingEl.className = 'message assistant';
+                streamingEl.id = '';
+            }
+        }
+
+        function connectWebSocket() {
+            const companionId = document.getElementById('companionId').value;
+            const userId = document.getElementById('userId').value;
+            
+            if (!companionId || !userId) {
+                alert('请输入伙伴ID和用户ID');
+                return;
+            }
+
+            updateStatus('connecting', '🔄 连接中...');
+            
+            socket = io('http://localhost:8000', {
+                transports: ['websocket', 'polling'],
+                timeout: 10000,
+                forceNew: true
+            });
+
+            socket.on('connect', () => {
+                console.log('✅ WebSocket连接成功');
+                updateStatus('connected', '✅ 已连接');
+                
+                // 加入聊天
+                socket.emit('join_chat', {
+                    companion_id: parseInt(companionId),
+                    user_id: userId
+                });
+            });
+
+            socket.on('disconnect', () => {
+                console.log('❌ WebSocket连接断开');
+                updateStatus('disconnected', '❌ 已断开');
+            });
+
+            socket.on('connect_error', (error) => {
+                console.error('❌ WebSocket连接错误:', error);
+                updateStatus('disconnected', '❌ 连接失败');
+            });
+
+            socket.on('chat_joined', (data) => {
+                console.log('✅ 成功加入聊天:', data);
+                addMessage('assistant', `🎉 成功加入聊天！伙伴ID: ${companionId}`);
+            });
+
+            socket.on('message_received', (data) => {
+                console.log('📨 消息已接收:', data);
+            });
+
+            socket.on('response_start', () => {
+                console.log('🚀 开始接收流式响应');
+                currentStreamingMessage = addMessage('assistant', '', true);
+            });
+
+            socket.on('response_chunk', (data) => {
+                console.log('📝 接收到响应块:', data.chunk);
+                if (currentStreamingMessage) {
+                    const currentContent = currentStreamingMessage.textContent + data.chunk;
+                    updateStreamingMessage(currentContent);
+                }
+            });
+
+            socket.on('response_end', () => {
+                console.log('✅ 流式响应完成');
+                finalizeStreamingMessage();
+                currentStreamingMessage = null;
+            });
+
+            socket.on('error', (error) => {
+                console.error('❌ 聊天错误:', error);
+                addMessage('assistant', `❌ 错误: ${error.message}`);
+            });
+        }
+
+        function disconnectWebSocket() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+                updateStatus('disconnected', '❌ 已断开');
+            }
+        }
+
+        function sendMessage() {
+            const messageInput = document.getElementById('messageInput');
+            const message = messageInput.value.trim();
+            
+            if (!message || !socket || !socket.connected) return;
+            
+            addMessage('user', message);
+            messageInput.value = '';
+            
+            socket.emit('send_message', {
+                message: message
+            });
+        }
+
+        // 回车发送消息
+        document.getElementById('messageInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // 页面加载完成后自动尝试连接
+        window.addEventListener('load', () => {
+            console.log('🌟 WebSocket 测试页面已加载');
+        });
+    </script>
+</body>
+</html>

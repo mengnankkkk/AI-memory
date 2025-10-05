@@ -125,7 +125,7 @@ def start_backend():
     # 启动uvicorn
     return subprocess.Popen([
         str(python_path), "-m", "uvicorn",
-        "app.main:app",
+        "app.main:socket_app",  # 使用socket_app而不是app
         "--reload",
         "--host", "127.0.0.1",
         "--port", "8000"

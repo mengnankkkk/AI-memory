@@ -9,7 +9,7 @@ from app.core.prompts import get_system_prompt
 from app.core.config import settings
 from typing import List, Dict
 
-router = APIRouter(prefix="/api/chat", tags=["chat"])
+router = APIRouter(prefix="/chat", tags=["chat"])
 
 # 简单的内存会话存储 (生产环境应使用Redis)
 session_memory: Dict[str, List[Dict[str, str]]] = {}

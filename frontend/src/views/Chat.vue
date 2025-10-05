@@ -1,35 +1,181 @@
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, onMounted, nextTick, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { companionService, chatService } from '@/services/companion'
+import { companionService } from '@/services/companion'
+import { useUserStore } from '@/stores/user'
+import { useWebSocketChat } from '@/services/websocket'
 import type { Companion, ChatMessage } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
+const {
+  isConnected,
+  isConnecting,
+  currentStreamingMessage,
+  connect,
+  disconnect,
+  joinChat,
+  sendMessage: sendSocketMessage,
+  onMessageReceived,
+  onResponseStart,
+  onResponseChunk,
+  onResponseEnd,
+  onError,
+  onChatJoined,
+  removeAllListeners
+} = useWebSocketChat()
 
 const companionId = Number(route.params.companionId)
-const sessionId = ref(`session_${Date.now()}`)
 
 const companion = ref<Companion | null>(null)
 const messages = ref<ChatMessage[]>([])
 const userInput = ref('')
 const isLoading = ref(false)
 const chatContainer = ref<HTMLElement | null>(null)
+const currentChatSession = ref<any>(null)
+const connectionStatus = ref('连接中...')
 
-// 加载伙伴信息
+// 加载伙伴信息和聊天历史
 const loadCompanion = async () => {
   try {
     companion.value = await companionService.get(companionId)
+    
+    // 从用户store查找对应的伙伴信息
+    const storeCompanion = userStore.companions.find(c => c.id === companionId)
+    if (storeCompanion) {
+      userStore.setCurrentCompanion(storeCompanion)
+    }
+    
     // 添加问候消息
     messages.value.push({
       role: 'assistant',
-      content: companion.value.greeting
+      content: companion.value.greeting || '你好！我是你的AI伙伴，很高兴认识你！'
     })
+    
+    // 加载聊天会话历史
+    await loadChatHistory()
+    
   } catch (error) {
     console.error('加载失败:', error)
     alert('无法加载伙伴信息')
     router.push({ name: 'home' })
   }
+}
+
+// 加载聊天历史
+const loadChatHistory = async () => {
+  try {
+    // 获取该伙伴的会话历史
+    await userStore.loadChatSessions(companionId)
+    
+    if (userStore.chatSessions.length > 0) {
+      // 使用最新的会话
+      const latestSession = userStore.chatSessions[0]
+      currentChatSession.value = latestSession
+      userStore.setCurrentSession(latestSession)
+      
+      // 加载该会话的消息历史
+      await userStore.loadChatMessages(latestSession.id)
+      
+      // 将历史消息添加到当前消息列表
+      if (userStore.chatMessages.length > 0) {
+        // 清空问候消息，用历史消息替换
+        messages.value = [...userStore.chatMessages]
+      }
+    } else {
+      // 创建新会话
+      const newSession = await userStore.createChatSession(
+        companionId,
+        `与${companion.value?.name}的对话`
+      )
+      if (newSession) {
+        currentChatSession.value = newSession
+        userStore.setCurrentSession(newSession)
+      }
+    }
+  } catch (error) {
+    console.error('加载聊天历史失败:', error)
+  }
+}
+
+// 初始化WebSocket连接
+const initWebSocket = () => {
+  connect()
+  
+  // 监听连接状态
+  onChatJoined((data) => {
+    console.log('✅ 成功加入聊天:', data)
+    connectionStatus.value = '已连接'
+  })
+  
+  // 监听消息确认
+  onMessageReceived((message) => {
+    console.log('📨 消息已接收:', message)
+  })
+  
+  // 监听流式响应开始
+  onResponseStart(() => {
+    console.log('🚀 开始接收流式响应')
+    // 添加一个空的助手消息用于流式更新
+    messages.value.push({
+      role: 'assistant',
+      content: ''
+    })
+    scrollToBottom()
+  })
+  
+  // 监听流式响应块
+  onResponseChunk((chunk) => {
+    // 更新最后一条助手消息
+    const lastMessage = messages.value[messages.value.length - 1]
+    if (lastMessage && lastMessage.role === 'assistant') {
+      lastMessage.content += chunk
+      scrollToBottom()
+    }
+  })
+  
+  // 监听流式响应结束
+  onResponseEnd((fullContent) => {
+    console.log('✅ 流式响应完成:', fullContent)
+    // 确保最后一条消息内容正确
+    const lastMessage = messages.value[messages.value.length - 1]
+    if (lastMessage && lastMessage.role === 'assistant') {
+      lastMessage.content = fullContent
+      
+      // 保存消息到用户store
+      userStore.addChatMessage({
+        id: Date.now(),
+        role: 'assistant',
+        content: fullContent,
+        timestamp: new Date().toISOString()
+      })
+    }
+    isLoading.value = false
+  })
+  
+  // 监听错误
+  onError((error) => {
+    console.error('❌ 聊天错误:', error)
+    alert(`聊天错误: ${error.message}`)
+    isLoading.value = false
+  })
+  
+  // 连接成功后加入聊天
+  const checkAndJoinChat = () => {
+    if (isConnected.value && companionId && currentChatSession.value) {
+      joinChat(
+        companionId,
+        userStore.userId,
+        currentChatSession.value.id
+      )
+    } else {
+      // 等待连接或数据加载完成后重试
+      setTimeout(checkAndJoinChat, 1000)
+    }
+  }
+  
+  setTimeout(checkAndJoinChat, 1000)
 }
 
 // 滚动到底部
@@ -43,42 +189,56 @@ const scrollToBottom = () => {
 
 // 发送消息
 const sendMessage = async () => {
-  if (!userInput.value.trim() || isLoading.value) return
+  if (!userInput.value.trim() || isLoading.value || !isConnected.value) return
 
   const message = userInput.value.trim()
   userInput.value = ''
 
   // 添加用户消息
-  messages.value.push({
-    role: 'user',
-    content: message
+  const userMessage = {
+    role: 'user' as const,
+    content: message,
+    timestamp: new Date().toISOString()
+  }
+  
+  messages.value.push(userMessage)
+  
+  // 保存用户消息到store
+  userStore.addChatMessage({
+    id: Date.now(),
+    ...userMessage
   })
+  
   scrollToBottom()
 
   isLoading.value = true
+  
   try {
-    const response = await chatService.sendMessage({
-      companion_id: companionId,
-      message: message,
-      session_id: sessionId.value
-    })
-
-    // 添加助手回复
-    messages.value.push({
-      role: 'assistant',
-      content: response.message
-    })
-    scrollToBottom()
+    // 通过WebSocket发送消息
+    sendSocketMessage(message)
   } catch (error) {
     console.error('发送失败:', error)
     alert('消息发送失败,请重试')
-  } finally {
     isLoading.value = false
   }
 }
 
-onMounted(() => {
-  loadCompanion()
+// 重新连接WebSocket
+const reconnectWebSocket = () => {
+  disconnect()
+  setTimeout(() => {
+    initWebSocket()
+  }, 1000)
+}
+
+onMounted(async () => {
+  await loadCompanion()
+  initWebSocket()
+})
+
+onBeforeUnmount(() => {
+  removeAllListeners()
+  disconnect()
 })
 </script>
 
@@ -110,9 +270,25 @@ onMounted(() => {
         </div>
 
         <div class="flex items-center space-x-2">
-          <span class="text-xs text-green-500 flex items-center">
-            <span class="w-2 h-2 bg-green-500 rounded-full mr-1"></span>
-            在线
+          <!-- WebSocket连接状态 -->
+          <div class="flex items-center space-x-1">
+            <span 
+              :class="[
+                'w-2 h-2 rounded-full',
+                isConnected ? 'bg-green-500' : isConnecting ? 'bg-yellow-500' : 'bg-red-500'
+              ]"
+            ></span>
+            <span :class="[
+              'text-xs',
+              isConnected ? 'text-green-600' : isConnecting ? 'text-yellow-600' : 'text-red-600'
+            ]">
+              {{ isConnected ? '已连接' : isConnecting ? '连接中' : '已断开' }}
+            </span>
+          </div>
+          
+          <!-- 会话信息 -->
+          <span v-if="currentChatSession" class="text-xs text-gray-500">
+            {{ currentChatSession.session_title }}
           </span>
         </div>
       </div>
@@ -167,14 +343,14 @@ onMounted(() => {
             placeholder="说点什么吧..."
             rows="1"
             class="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none resize-none"
-            :disabled="isLoading"
+            :disabled="isLoading || !isConnected"
           ></textarea>
           <button
             type="submit"
-            :disabled="!userInput.trim() || isLoading"
+            :disabled="!userInput.trim() || isLoading || !isConnected"
             class="px-6 py-3 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
-            发送
+            {{ isLoading ? '发送中...' : !isConnected ? '未连接' : '发送' }}
           </button>
         </form>
         <p class="text-xs text-gray-400 mt-2 text-center">

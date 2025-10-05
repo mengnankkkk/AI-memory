@@ -2,17 +2,23 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { companionService } from '@/services/companion'
+import { useUserStore } from '@/stores/user'
 import type { CompanionCreate } from '@/types'
 
 const router = useRouter()
+const userStore = useUserStore()
 
 const step = ref(1)
-const formData = ref<CompanionCreate>({
-  user_id: 'demo_user', // 实际应用中从认证系统获取
+
+// 创建响应式的表单数据
+const createFormData = (): CompanionCreate => ({
+  user_id: userStore.userId,
   name: '',
   avatar_id: 'avatar_01',
   personality_archetype: 'listener'
 })
+
+const formData = ref<CompanionCreate>(createFormData())
 
 const personalities = [
   {
@@ -60,9 +66,18 @@ const createCompanion = async () => {
     return
   }
 
+  // 确保使用最新的userId
+  formData.value.user_id = userStore.userId
+
   isCreating.value = true
   try {
     const companion = await companionService.create(formData.value)
+    
+    // 刷新用户的伙伴列表
+    await userStore.loadUserCompanions()
+    
+    // 设置当前伙伴并跳转到聊天页面
+    userStore.setCurrentCompanion(companion)
     router.push({ name: 'chat', params: { companionId: companion.id } })
   } catch (error) {
     console.error('创建失败:', error)
