@@ -1,10 +1,5 @@
 import asyncio
-from contextlib import asynccontexapp.include_router(sessions_router, prefix="/api")
-app.include_router(ab_test_router, prefix="/api")
-app.include_router(config_router, prefix="/api")
-app.include_router(export_router, prefix="/api")
-app.include_router(notification_router, prefix="/api")
-app.include_router(stats_router, prefix="/api")er
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
@@ -17,6 +12,7 @@ from app.api.config import router as config_router
 from app.api.export import router as export_router
 from app.api.notification import router as notification_router
 from app.api.stats import router as stats_router
+from app.api.romance import router as romance_router  # 新增恋爱攻略路由
 import socketio
 
 @asynccontextmanager
@@ -58,6 +54,7 @@ app.include_router(config_router, prefix="/api")
 app.include_router(export_router, prefix="/api")
 app.include_router(notification_router, prefix="/api")
 app.include_router(stats_router, prefix="/api")
+app.include_router(romance_router, prefix="/api")  # 新增恋爱攻略路由
 
 # 创建 Socket.IO 服务器
 sio = socketio.AsyncServer(

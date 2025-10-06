@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     DEBUG: bool = True
 
     # CORS配置
-    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173,http://localhost:8080"
+    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173,http://localhost:5174,http://localhost:8080"
 
     # 会话配置
     SESSION_EXPIRE_SECONDS: int = 3600
