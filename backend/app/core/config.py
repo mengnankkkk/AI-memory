@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     SESSION_EXPIRE_SECONDS: int = 3600
     MAX_CONTEXT_MESSAGES: int = 10
 
+    # Redis配置
+    REDIS_URL: str = "redis://localhost:6379/0"
+
     class Config:
         env_file = ".env"
         case_sensitive = True

@@ -14,6 +14,7 @@ class Companion(Base):
     avatar_id = Column(String(50), nullable=False)
     personality_archetype = Column(String(50), nullable=False)
     custom_greeting = Column(Text, nullable=True)
+    prompt_version = Column(String(10), nullable=True, default="v1")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
@@ -30,3 +31,4 @@ class Message(Base):
     role = Column(String(20), nullable=False)  # user | assistant
     content = Column(Text, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    feedback_score = Column(Integer, nullable=True)  # 1=点赞，-1=点踩

@@ -1,5 +1,10 @@
 import asyncio
-from contextlib import asynccontextmanager
+from contextlib import asynccontexapp.include_router(sessions_router, prefix="/api")
+app.include_router(ab_test_router, prefix="/api")
+app.include_router(config_router, prefix="/api")
+app.include_router(export_router, prefix="/api")
+app.include_router(notification_router, prefix="/api")
+app.include_router(stats_router, prefix="/api")er
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
@@ -7,6 +12,11 @@ from app.core.database import init_db
 from app.api.companions import router as companions_router
 from app.api.chat import router as chat_router
 from app.api.chat_sessions import router as sessions_router
+from app.api.ab_test import router as ab_test_router
+from app.api.config import router as config_router
+from app.api.export import router as export_router
+from app.api.notification import router as notification_router
+from app.api.stats import router as stats_router
 import socketio
 
 @asynccontextmanager
@@ -43,13 +53,23 @@ app.add_middleware(
 app.include_router(companions_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
 app.include_router(sessions_router, prefix="/api")
+app.include_router(ab_test_router, prefix="/api")
+app.include_router(config_router, prefix="/api")
+app.include_router(export_router, prefix="/api")
+app.include_router(notification_router, prefix="/api")
+app.include_router(stats_router, prefix="/api")
 
 # 创建 Socket.IO 服务器
 sio = socketio.AsyncServer(
     async_mode='asgi',
     cors_allowed_origins=settings.allowed_origins_list,
     logger=settings.DEBUG,
-    engineio_logger=settings.DEBUG
+    engineio_logger=settings.DEBUG,
+    compression=True,  # 启用压缩
+    engineio_options={
+        'compression': True,
+        'perMessageDeflate': True
+    }
 )
 
 # 注册聊天引擎事件处理器

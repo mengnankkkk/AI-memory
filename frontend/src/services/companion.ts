@@ -12,6 +12,16 @@ export const companionService = {
     return api.get(`/companions/${id}`)
   },
 
+  // 更新伙伴信息
+  update(id: number, data: Partial<Companion>): Promise<Companion> {
+    return api.put(`/companions/${id}`, data)
+  },
+
+  // 重置伙伴
+  reset(id: number): Promise<{ message: string }> {
+    return api.post(`/companions/${id}/reset`)
+  },
+
   // 删除伙伴
   delete(id: number): Promise<{ message: string }> {
     return api.delete(`/companions/${id}`)

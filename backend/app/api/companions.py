@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
 from app.models.companion import Companion
 from app.api.schemas import CompanionCreate, CompanionResponse
 from app.core.prompts import get_greeting
-from typing import List, Optional
+from typing import List, Optional, Dict
+from app.core.redis_client import get_redis
 
 router = APIRouter(prefix="/companions", tags=["companions"])
 
@@ -49,30 +50,33 @@ async def get_companion(
     user_id: Optional[str] = None,  # 可选的用户验证
     db: AsyncSession = Depends(get_db)
 ):
-    """获取伙伴信息"""
+    """获取伙伴信息，优先查Redis缓存"""
+    redis = await get_redis()
+    cache_key = f"companion:{companion_id}"
+    cached = await redis.get(cache_key)
+    if cached:
+        import json
+        return CompanionResponse(**json.loads(cached))
     query = select(Companion).where(Companion.id == companion_id)
-    
-    # 如果提供了user_id，添加用户验证
     if user_id:
         query = query.where(Companion.user_id == user_id)
-    
     result = await db.execute(query)
     companion = result.scalar_one_or_none()
-
     if not companion:
         raise HTTPException(status_code=404, detail="伙伴不存在或无权访问")
-
     greeting = get_greeting(companion.name, companion.personality_archetype)
-
-    return CompanionResponse(
+    resp = CompanionResponse(
         id=companion.id,
         user_id=companion.user_id,
         name=companion.name,
         avatar_id=companion.avatar_id,
         personality_archetype=companion.personality_archetype,
         custom_greeting=companion.custom_greeting,
-        greeting=greeting
+        greeting=greeting,
+        prompt_version=getattr(companion, 'prompt_version', 'v1')
     )
+    await redis.set(cache_key, resp.model_dump_json(), ex=600)
+    return resp
 
 
 @router.delete("/{companion_id}")
@@ -91,7 +95,9 @@ async def delete_companion(
 
     await db.delete(companion)
     await db.commit()
-
+    # 清理缓存
+    redis = await get_redis()
+    await redis.delete(f"companion:{companion_id}")
     return {"message": "伙伴已删除"}
 
 
@@ -127,3 +133,60 @@ async def get_user_companions(
         ))
 
     return response_companions
+
+
+@router.put("/{companion_id}", response_model=CompanionResponse)
+async def update_companion(
+    companion_id: int,
+    data: Dict = Body(...),
+    db: AsyncSession = Depends(get_db)
+):
+    """更新伙伴信息"""
+    result = await db.execute(select(Companion).where(Companion.id == companion_id))
+    companion = result.scalar_one_or_none()
+    if not companion:
+        raise HTTPException(status_code=404, detail="伙伴不存在")
+    # 更新字段
+    for key, value in data.items():
+        if hasattr(companion, key):
+            setattr(companion, key, value)
+    # 默认prompt_version
+    if not hasattr(companion, 'prompt_version'):
+        setattr(companion, 'prompt_version', data.get('prompt_version', 'v1'))
+    await db.commit()
+    await db.refresh(companion)
+    # 清理缓存
+    redis = await get_redis()
+    await redis.delete(f"companion:{companion_id}")
+    greeting = get_greeting(companion.name, companion.personality_archetype)
+    return CompanionResponse(
+        id=companion.id,
+        user_id=companion.user_id,
+        name=companion.name,
+        avatar_id=companion.avatar_id,
+        personality_archetype=companion.personality_archetype,
+        custom_greeting=companion.custom_greeting,
+        greeting=greeting
+    )
+
+
+@router.post("/{companion_id}/reset")
+async def reset_companion(
+    companion_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """重置伙伴为默认配置（保留名称和头像，重置性格和自定义提示、Prompt版本）"""
+    result = await db.execute(select(Companion).where(Companion.id == companion_id))
+    companion = result.scalar_one_or_none()
+    if not companion:
+        raise HTTPException(status_code=404, detail="伙伴不存在")
+    companion.personality_archetype = "listener"
+    companion.custom_greeting = None
+    if hasattr(companion, 'prompt_version'):
+        companion.prompt_version = 'v1'
+    await db.commit()
+    await db.refresh(companion)
+    # 清理缓存
+    redis = await get_redis()
+    await redis.delete(f"companion:{companion_id}")
+    return {"message": "伙伴已重置为默认配置"}

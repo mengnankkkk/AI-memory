@@ -9,6 +9,7 @@ class CompanionCreate(BaseModel):
     avatar_id: str
     personality_archetype: str
     custom_greeting: Optional[str] = None
+    prompt_version: Optional[str] = "v1"
 
 
 class CompanionResponse(BaseModel):
@@ -20,6 +21,7 @@ class CompanionResponse(BaseModel):
     personality_archetype: str
     custom_greeting: Optional[str]
     greeting: str  # 生成的问候语
+    prompt_version: Optional[str] = "v1"
 
     class Config:
         from_attributes = True

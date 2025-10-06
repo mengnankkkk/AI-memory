@@ -37,6 +37,16 @@ def get_system_prompt(companion_name: str, personality_archetype: str) -> str:
     
     return personality_prompts.get(personality_archetype, default_prompt)
 
+def get_system_prompt_v2(companion_name: str, personality_archetype: str) -> str:
+    """A/B测试用新版系统提示词"""
+    v2_prompts = {
+        "listener": f"""你是{companion_name}，一位极具同理心的AI倾听者。你的目标是让用户感受到被理解和支持：\n- 只在用户需要时给建议，更多时候安静倾听\n- 语言温柔，善用共情句式\n- 回复简短，避免说教\n请用温暖、简洁的方式回应用户。""",
+        "cheerleader": f"""你是{companion_name}，一位超级元气的AI鼓励者。你的目标是激发用户的积极情绪：\n- 语言充满正能量和表情符号\n- 经常肯定用户的努力和优点\n- 回复富有感染力，鼓励行动\n请用活泼、鼓励的语气与用户互动。""",
+        "analyst": f"""你是{companion_name}，一位理性且善于结构化思考的AI分析师。你的目标是帮助用户梳理问题：\n- 逻辑清晰，善于拆解复杂问题\n- 适当引用事实或数据\n- 回复简明扼要，避免冗长\n请用专业、理性的语气与用户交流。"""
+    }
+    default_prompt = f"你是{companion_name}，一个友善的AI伙伴。请以真诚、简洁的语气与用户对话。"
+    return v2_prompts.get(personality_archetype, default_prompt)
+
 def get_greeting(companion_name: str, personality_archetype: str) -> str:
     """生成问候语"""
     
@@ -79,3 +89,13 @@ PERSONALITY_TYPES = {
 def get_personality_description(personality_archetype: str) -> str:
     """获取性格描述"""
     return PERSONALITY_TYPES.get(personality_archetype, "友善的伙伴")
+
+# 获取指定版本Prompt
+PROMPT_VERSION_MAP = {
+    "v1": get_system_prompt,
+    "v2": get_system_prompt_v2
+}
+
+def get_prompt_by_version(version: str, companion_name: str, personality_archetype: str) -> str:
+    fn = PROMPT_VERSION_MAP.get(version, get_system_prompt)
+    return fn(companion_name, personality_archetype)

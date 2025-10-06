@@ -74,6 +74,9 @@ function startChat(companion: any) {
           <button @click="userStore.resetUserId()" class="ml-2 text-primary-500 hover:text-primary-600">
             重置
           </button>
+          <button @click="router.push({ name: 'system-settings' })" class="ml-2 text-blue-500 hover:text-blue-600">
+            系统设置
+          </button>
         </div>
 
         <p class="text-sm text-gray-500">

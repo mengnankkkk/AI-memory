@@ -5,6 +5,7 @@ import { companionService } from '@/services/companion'
 import { useUserStore } from '@/stores/user'
 import { useWebSocketChat } from '@/services/websocket'
 import type { Companion, ChatMessage } from '@/types'
+import api from '@/services/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -231,6 +232,28 @@ const reconnectWebSocket = () => {
   }, 1000)
 }
 
+// 跳转到伙伴设置页
+function goToSettings() {
+  if (companion.value && companion.value.id) {
+    router.push({ name: 'settings', params: { companionId: companion.value.id } })
+  }
+}
+
+// 反馈消息
+async function feedback(msg: ChatMessage, score: number) {
+  try {
+    if (!msg.id || !companion.value) return
+    await api.post('/chat/feedback', {
+      companion_id: companion.value.id,
+      message_id: msg.id,
+      score
+    })
+    alert('反馈已提交')
+  } catch (e) {
+    alert('反馈失败')
+  }
+}
+
 onMounted(async () => {
   await loadCompanion()
   initWebSocket()
@@ -317,6 +340,22 @@ onBeforeUnmount(() => {
             ]"
           >
             <p class="text-sm leading-relaxed whitespace-pre-wrap">{{ msg.content }}</p>
+            
+            <!-- 点赞/点踩按钮 -->
+            <div v-if="msg.role === 'assistant'" class="flex space-x-2 mt-2">
+              <button
+                @click="feedback(msg, 1)"
+                class="flex items-center px-3 py-1 text-sm font-medium text-green-600 bg-green-100 rounded-lg hover:bg-green-200 transition-all"
+              >
+                👍
+              </button>
+              <button
+                @click="feedback(msg, -1)"
+                class="flex items-center px-3 py-1 text-sm font-medium text-red-600 bg-red-100 rounded-lg hover:bg-red-200 transition-all"
+              >
+                👎
+              </button>
+            </div>
           </div>
         </div>
 

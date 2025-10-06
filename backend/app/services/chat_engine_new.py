@@ -9,13 +9,10 @@ from typing import Dict, List, Optional, AsyncIterator
 import socketio
 from app.services.streaming_llm import streaming_llm_service
 from app.services.memory_manager import memory_manager, SystemPromptGenerator, content_filter
-from app.services.redis_utils import redis_session_manager, redis_stats_manager
-from app.services.analytics import analytics_service
-from app.services.hot_cache import hot_conversation_cache
 from app.core.config import settings
 from app.models.companion import Companion
 from app.models.chat_session import ChatSession, ChatMessage
-from app.core.database import async_session_maker
+from app.core.database import get_async_session, async_session_maker
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 
@@ -37,17 +34,6 @@ class ChatEngine:
             'chat_session_id': chat_session_id,  # 数据库中的会话ID
             'created_at': asyncio.get_event_loop().time()
         }
-        
-        # 在 Redis 中创建会话
-        await redis_session_manager.create_session(
-            session_id=session_id,
-            user_id=str(user_id),
-            companion_id=companion_id,
-            data={'chat_session_id': chat_session_id}
-        )
-        
-        # 增加会话创建统计
-        await redis_stats_manager.increment_counter("sessions_created")
         
         logger.info(f"创建聊天会话: {session_id}, 伙伴ID: {companion_id}, 数据库会话ID: {chat_session_id}")
     
@@ -87,17 +73,9 @@ class ChatEngine:
             if not session or not session.get('chat_session_id'):
                 return []
             
-            return await self.load_chat_history_by_session_id(session['chat_session_id'], limit)
-        except Exception as e:
-            logger.error(f"加载聊天历史失败: {e}")
-            return []
-    
-    async def load_chat_history_by_session_id(self, chat_session_id: int, limit: int = 10) -> List[Dict]:
-        """根据会话ID从数据库加载聊天历史"""
-        try:
             async with async_session_maker() as db:
                 stmt = select(ChatMessage).where(
-                    ChatMessage.session_id == chat_session_id
+                    ChatMessage.session_id == session['chat_session_id']
                 ).order_by(ChatMessage.timestamp.desc()).limit(limit)
                 
                 result = await db.execute(stmt)
@@ -114,7 +92,7 @@ class ChatEngine:
                 
                 return history
         except Exception as e:
-            logger.error(f"根据会话ID加载聊天历史失败: {e}")
+            logger.error(f"加载聊天历史失败: {e}")
             return []
     
     async def get_session(self, session_id: str) -> Optional[Dict]:
@@ -163,26 +141,7 @@ class ChatEngine:
             if not is_safe and filter_reason:
                 yield content_filter.get_filtered_response(filter_reason)
                 return
-
-            # 更新 Redis 会话活跃时间
-            await redis_session_manager.update_session_activity(session_id)
             
-            # 增加消息处理统计
-            await redis_stats_manager.increment_counter("messages_processed")
-
-            # 检查热门对话缓存
-            cached_response = await hot_conversation_cache.get_cached_response(
-                'companion', user_message
-            )
-            if cached_response:
-                # 使用缓存的回复
-                await redis_stats_manager.increment_counter("cache_hits")
-                yield cached_response
-                # 保存用户消息和缓存回复到数据库
-                await self.save_message_to_db(session_id, "user", user_message)
-                await self.save_message_to_db(session_id, "assistant", cached_response)
-                return
-
             # 保存用户消息到数据库
             await self.save_message_to_db(session_id, "user", user_message)
             
@@ -194,15 +153,6 @@ class ChatEngine:
             if not companion_info:
                 yield "抱歉，找不到对应的AI伙伴信息。"
                 return
-
-            # 记录 Prompt 版本使用埋点
-            prompt_version = companion_info.get('prompt_version', 'v1')
-            await analytics_service.track_prompt_usage(
-                session['user_id'], 
-                prompt_version, 
-                session['companion_id'],
-                companion_info.get('personality', 'companion')
-            )
             
             # 生成系统提示词
             system_prompt = SystemPromptGenerator.generate_system_prompt(
@@ -230,21 +180,8 @@ class ChatEngine:
                 await self.save_message_to_db(session_id, "assistant", assistant_response)
                 await memory_manager.add_message(session_id, "assistant", assistant_response)
                 
-                # 检查是否为高质量回复，缓存到热门对话
-                if len(assistant_response) > 50 and len(assistant_response) < 1000:
-                    await hot_conversation_cache.cache_response(
-                        'companion',
-                        user_message,
-                        assistant_response
-                    )
-                
-                # 增加成功回复统计
-                await redis_stats_manager.increment_counter("successful_responses")
-                
         except Exception as e:
             logger.error(f"处理消息时出错: {e}")
-            # 增加错误统计
-            await redis_stats_manager.increment_counter("error_responses")
             yield "抱歉，我现在遇到了一些技术问题，请稍后再试。😅"
     
     async def stream_llm_response(self, system_prompt: str, messages: List[Dict]) -> AsyncIterator[str]:
@@ -262,17 +199,22 @@ class ChatEngine:
             
             # 使用流式 LLM 服务
             assistant_response = ""
-            async for content in streaming_llm_service.stream_chat_completion(llm_messages):
-                # 内容过滤
-                is_safe, filter_reason = await content_filter.is_content_safe(content)
-                if not is_safe and filter_reason:
-                    logger.warning(f"Content filtered in streaming response: {filter_reason}")
-                    filtered_content = content_filter.get_filtered_response(filter_reason)
-                else:
-                    filtered_content = content
-                
-                assistant_response += filtered_content
-                yield filtered_content
+            async for chunk_type, content in streaming_llm_service.stream_chat_completion(llm_messages):
+                if chunk_type == "content":
+                    # 内容过滤
+                    is_safe, filter_reason = await content_filter.is_content_safe(content)
+                    if not is_safe and filter_reason:
+                        logger.warning(f"Content filtered in streaming response: {filter_reason}")
+                        filtered_content = content_filter.get_filtered_response(filter_reason)
+                    else:
+                        filtered_content = content
+                    
+                    assistant_response += filtered_content
+                    yield filtered_content
+                    
+                elif chunk_type == "done":
+                    # 流式传输完成
+                    break
                     
         except Exception as e:
             logger.error(f"LLM 流式调用失败: {e}")
@@ -313,16 +255,13 @@ def register_socketio_events(sio_instance):
                 await sio_instance.emit('error', {'message': '缺少伙伴ID'}, room=sid)
                 return
             
-            # 创建聊天会话（已经包含了Redis集成）
+            # 创建聊天会话
             await chat_engine.create_session(sid, companion_id, user_id, chat_session_id)
             
             # 如果有现有会话ID，加载历史消息
             history = []
             if chat_session_id:
-                history = await chat_engine.load_chat_history_by_session_id(chat_session_id, limit=20)
-            
-            # 增加会话加入统计
-            await redis_stats_manager.increment_counter("chat_sessions_joined")
+                history = await chat_engine.load_chat_history(sid, limit=20)
             
             await sio_instance.emit('chat_joined', {
                 'companion_id': companion_id,
