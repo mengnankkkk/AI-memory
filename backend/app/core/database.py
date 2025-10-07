@@ -3,11 +3,14 @@ from sqlalchemy.orm import declarative_base
 from app.core.config import settings
 
 # 创建异步引擎
-engine = create_async_engine(
+async_engine = create_async_engine(
     settings.DATABASE_URL,
     echo=settings.DEBUG,
     future=True
 )
+
+# 为了兼容性，保留原名称
+engine = async_engine
 
 # 创建异步会话工厂
 async_session_maker = async_sessionmaker(
@@ -32,8 +35,9 @@ async def get_db() -> AsyncSession:
 async def init_db():
     """初始化数据库"""
     # 导入所有模型以确保它们被注册
+    from app.models.user import User
     from app.models.companion import Companion, Message
     from app.models.chat_session import ChatSession, ChatMessage
-    
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

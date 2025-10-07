@@ -1,24 +1,36 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 import { onMounted, ref } from 'vue'
-import { useUserStore } from '@/stores/user'
+import { useAuthStore } from '@/stores/auth'
+import api from '@/services/auth'
 
 const router = useRouter()
-const userStore = useUserStore()
+const authStore = useAuthStore()
 
-const showCompanions = ref(false)
+const systemCompanions = ref<any[]>([])
+const loading = ref(true)
 
 onMounted(async () => {
-  await userStore.loadUserCompanions()
-  if (userStore.hasCompanions) {
-    showCompanions.value = true
+  try {
+    // 获取系统预设角色
+    const response = await api.get('/companions/system')
+    systemCompanions.value = response.data
+  } catch (error) {
+    console.error('加载系统角色失败:', error)
+  } finally {
+    loading.value = false
   }
 })
 
 function startChat(companion: any) {
-  userStore.setCurrentCompanion(companion)
   router.push({ name: 'chat', params: { companionId: companion.id } })
-}</script>
+}
+
+async function handleLogout() {
+  await authStore.logout()
+  router.push('/login')
+}
+</script>
 
 <template>
   <div class="min-h-screen flex items-center justify-center p-4">
@@ -37,44 +49,49 @@ function startChat(companion: any) {
       </div>
 
       <div class="space-y-4">
-        <button
-          @click="router.push({ name: 'create' })"
-          class="w-full md:w-auto px-12 py-4 bg-primary-500 text-white text-lg font-bold rounded-xl hover:bg-primary-600 transition-all shadow-lg hover:shadow-xl"
-        >
-          创建我的AI伙伴
-        </button>
-
-        <!-- 显示已有的AI伙伴 -->
-        <div v-if="showCompanions && userStore.hasCompanions" class="mt-8">
-          <h3 class="text-xl font-bold text-gray-800 mb-4">我的AI伙伴</h3>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <!-- 显示系统预设的AI伙伴 -->
+        <div v-if="!loading" class="mt-8">
+          <h3 class="text-2xl font-bold text-gray-800 mb-6">选择你的AI伙伴</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div
-              v-for="companion in userStore.companions"
+              v-for="companion in systemCompanions"
               :key="companion.id"
               @click="startChat(companion)"
-              class="p-4 bg-white rounded-lg shadow-md hover:shadow-lg transition-all cursor-pointer border-2 border-transparent hover:border-primary-300"
+              class="p-6 bg-white rounded-xl shadow-md hover:shadow-xl transition-all cursor-pointer border-2 border-transparent hover:border-primary-300 transform hover:scale-105"
             >
-              <div class="flex items-center space-x-3">
-                <div class="w-12 h-12 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+              <div class="flex flex-col items-center space-y-3">
+                <div class="w-16 h-16 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full flex items-center justify-center text-white font-bold text-2xl">
                   {{ companion.name.charAt(0) }}
                 </div>
-                <div class="flex-1">
-                  <h4 class="font-semibold text-gray-800">{{ companion.name }}</h4>
-                  <p class="text-sm text-gray-500">{{ companion.personality_archetype }}</p>
-                  <p class="text-xs text-gray-400">{{ companion.session_count }} 次会话</p>
+                <div class="text-center">
+                  <h4 class="font-bold text-xl text-gray-800 mb-1">{{ companion.name }}</h4>
+                  <p class="text-sm text-gray-600 mb-2">{{ companion.description }}</p>
+                  <p class="text-xs text-gray-400 italic">"{{ companion.custom_greeting }}"</p>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- 用户ID显示（开发时使用） -->
-        <div class="mt-4 text-xs text-gray-400">
-          用户ID: {{ userStore.userId.slice(-8) }}
-          <button @click="userStore.resetUserId()" class="ml-2 text-primary-500 hover:text-primary-600">
-            重置
+        <div v-if="loading" class="text-gray-500">
+          加载中...
+        </div>
+
+        <!-- 用户信息显示 -->
+        <div class="mt-4 flex items-center justify-center space-x-4 text-sm">
+          <span class="text-gray-600">
+            欢迎, {{ authStore.user?.username }}
+          </span>
+          <button
+            @click="handleLogout"
+            class="text-primary-500 hover:text-primary-600"
+          >
+            登出
           </button>
-          <button @click="router.push({ name: 'system-settings' })" class="ml-2 text-blue-500 hover:text-blue-600">
+          <button
+            @click="router.push({ name: 'system-settings' })"
+            class="text-blue-500 hover:text-blue-600"
+          >
             系统设置
           </button>
         </div>

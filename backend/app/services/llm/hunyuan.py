@@ -34,7 +34,7 @@ class HunyuanService(BaseLLMService):
         self.region = "ap-beijing"
         self.endpoint = "https://hunyuan.tencentcloudapi.com"
         
-        print(f"✓ 腾讯混元服务初始化成功 (模型: {model_name})")
+        print(f"[OK] 腾讯混元服务初始化成功 (模型: {model_name})")
 
     def _sign(self, secret_key: bytes, msg: str) -> bytes:
         """计算签名"""

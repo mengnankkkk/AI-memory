@@ -12,21 +12,22 @@ from app.api.config import router as config_router
 from app.api.export import router as export_router
 from app.api.notification import router as notification_router
 from app.api.stats import router as stats_router
-from app.api.romance import router as romance_router  # 新增恋爱攻略路由
+from app.api.romance import router as romance_router
+from app.api.auth import router as auth_router  # 用户认证路由
 import socketio
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
-    print("🚀 AI灵魂伙伴 v1.0.0 启动中...")
-    
+    print("[STARTUP] AI灵魂伙伴 v1.0.0 启动中...")
+
     # 初始化数据库
     await init_db()
-    print("✓ 数据库初始化完成")
-    
+    print("[OK] 数据库初始化完成")
+
     yield
-    
-    print("👋 AI灵魂伙伴正在关闭...")
+
+    print("[SHUTDOWN] AI灵魂伙伴正在关闭...")
 
 # 创建 FastAPI 应用
 app = FastAPI(
@@ -46,6 +47,7 @@ app.add_middleware(
 )
 
 # 注册路由
+app.include_router(auth_router, prefix="/api")  # 认证路由（需要最先注册）
 app.include_router(companions_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
 app.include_router(sessions_router, prefix="/api")
@@ -54,7 +56,7 @@ app.include_router(config_router, prefix="/api")
 app.include_router(export_router, prefix="/api")
 app.include_router(notification_router, prefix="/api")
 app.include_router(stats_router, prefix="/api")
-app.include_router(romance_router, prefix="/api")  # 新增恋爱攻略路由
+app.include_router(romance_router, prefix="/api")
 
 # 创建 Socket.IO 服务器
 sio = socketio.AsyncServer(

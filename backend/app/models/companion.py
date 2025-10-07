@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, DateTime, Text
+from sqlalchemy import Column, String, Integer, DateTime, Text, ForeignKey
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -9,11 +9,12 @@ class Companion(Base):
     __tablename__ = "companions"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String(255), index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
     name = Column(String(100), nullable=False)
     avatar_id = Column(String(50), nullable=False)
     personality_archetype = Column(String(50), nullable=False)
     custom_greeting = Column(Text, nullable=True)
+    description = Column(Text, nullable=True)  # 角色描述
     prompt_version = Column(String(10), nullable=True, default="v1")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

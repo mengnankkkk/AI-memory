@@ -6,7 +6,7 @@ import { useUserStore } from '@/stores/user'
 import { useWebSocketChat } from '@/services/websocket'
 import RomancePanel from '@/components/RomancePanel.vue'
 import type { Companion, ChatMessage } from '@/types'
-import api from '@/services/api'
+import api from '@/services/auth'
 
 const route = useRoute()
 const router = useRouter()

@@ -28,14 +28,14 @@ class GeminiService(BaseLLMService):
         """初始化Gemini客户端"""
         try:
             if not self.api_key or self.api_key == "your_gemini_api_key_here":
-                print("⚠️  Gemini API Key未配置，请在.env文件中设置GEMINI_API_KEY")
+                print("[WARN] Gemini API Key未配置，请在.env文件中设置GEMINI_API_KEY")
                 return
 
             genai.configure(api_key=self.api_key)
             self.model = genai.GenerativeModel(self.model_name)
-            print(f"✓ Gemini客户端初始化成功 (模型: {self.model_name})")
+            print(f"[OK] Gemini客户端初始化成功 (模型: {self.model_name})")
         except Exception as e:
-            print(f"✗ Gemini客户端初始化失败: {e}")
+            print(f"[ERROR] Gemini客户端初始化失败: {e}")
             self.model = None
 
     async def chat_completion(

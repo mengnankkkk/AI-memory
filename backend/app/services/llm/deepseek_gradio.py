@@ -20,9 +20,9 @@ class DeepSeekGradioService(BaseLLMService):
         """初始化Gradio客户端"""
         try:
             self.client = Client(self.api_url)
-            print(f"✓ {self.get_provider_name()} 客户端初始化成功")
+            print(f"[OK] {self.get_provider_name()} 客户端初始化成功")
         except Exception as e:
-            print(f"✗ {self.get_provider_name()} 客户端初始化失败: {e}")
+            print(f"[ERROR] {self.get_provider_name()} 客户端初始化失败: {e}")
             self.client = None
 
     async def chat_completion(

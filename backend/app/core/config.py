@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     # Redis配置
     REDIS_URL: str = "redis://localhost:6379/0"
 
+    # JWT认证配置
+    SECRET_KEY: str = "your-secret-key-please-change-in-production-09af8sd7f9a8sdf7a9s8df7"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7天
+
     class Config:
         env_file = ".env"
         case_sensitive = True

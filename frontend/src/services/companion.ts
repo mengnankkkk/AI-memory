@@ -1,41 +1,48 @@
-import api from './api'
+import api from './auth'
 import type { Companion, CompanionCreate, ChatRequest, ChatResponse } from '@/types'
 
 export const companionService = {
   // 创建伙伴
-  create(data: CompanionCreate): Promise<Companion> {
-    return api.post('/companions/', data)
+  async create(data: CompanionCreate): Promise<Companion> {
+    const response = await api.post('/companions/', data)
+    return response.data
   },
 
   // 获取伙伴信息
-  get(id: number): Promise<Companion> {
-    return api.get(`/companions/${id}`)
+  async get(id: number): Promise<Companion> {
+    const response = await api.get(`/companions/${id}`)
+    return response.data
   },
 
   // 更新伙伴信息
-  update(id: number, data: Partial<Companion>): Promise<Companion> {
-    return api.put(`/companions/${id}`, data)
+  async update(id: number, data: Partial<Companion>): Promise<Companion> {
+    const response = await api.put(`/companions/${id}`, data)
+    return response.data
   },
 
   // 重置伙伴
-  reset(id: number): Promise<{ message: string }> {
-    return api.post(`/companions/${id}/reset`)
+  async reset(id: number): Promise<{ message: string }> {
+    const response = await api.post(`/companions/${id}/reset`)
+    return response.data
   },
 
   // 删除伙伴
-  delete(id: number): Promise<{ message: string }> {
-    return api.delete(`/companions/${id}`)
+  async delete(id: number): Promise<{ message: string }> {
+    const response = await api.delete(`/companions/${id}`)
+    return response.data
   }
 }
 
 export const chatService = {
   // 发送消息
-  sendMessage(data: ChatRequest): Promise<ChatResponse> {
-    return api.post('/chat/', data)
+  async sendMessage(data: ChatRequest): Promise<ChatResponse> {
+    const response = await api.post('/chat/', data)
+    return response.data
   },
 
   // 清除会话
-  clearSession(sessionId: string): Promise<{ message: string }> {
-    return api.delete(`/chat/sessions/${sessionId}`)
+  async clearSession(sessionId: string): Promise<{ message: string }> {
+    const response = await api.delete(`/chat/sessions/${sessionId}`)
+    return response.data
   }
 }

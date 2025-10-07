@@ -15,7 +15,7 @@ class NewGradioHTTPService(BaseLLMService):
         # 确保URL以斜杠结尾
         if not self.api_url.endswith("/"):
             self.api_url += "/"
-        print(f"✓ {self.get_provider_name()} 初始化成功")
+        print(f"[OK] {self.get_provider_name()} 初始化成功")
 
     async def chat_completion(
         self,
