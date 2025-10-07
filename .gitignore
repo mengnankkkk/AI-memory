@@ -22,6 +22,7 @@ dist/
 # Environment
 .env.local
 .env
+backend\.env
 .claude
 
 # IDE
