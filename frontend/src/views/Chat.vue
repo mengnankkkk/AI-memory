@@ -19,6 +19,7 @@ const {
   disconnect,
   joinChat,
   sendMessage: sendSocketMessage,
+  setAutoJoinCallback,
   onMessageReceived,
   onResponseStart,
   onResponseChunk,
@@ -93,6 +94,10 @@ const loadChatHistory = async () => {
         `与${companion.value?.name}的对话`
       )
       if (newSession) {
+        console.log('🔍 创建新会话调试信息:', {
+          newSession,
+          sessionId: newSession.id
+        })
         currentChatSession.value = newSession
         userStore.setCurrentSession(newSession)
       }
@@ -110,6 +115,15 @@ const initWebSocket = () => {
   onChatJoined((data) => {
     console.log('✅ 成功加入聊天:', data)
     connectionStatus.value = '已连接'
+  })
+  
+  // 设置自动加入回调
+  setAutoJoinCallback(() => {
+    console.log('🔗 WebSocket连接成功，准备加入聊天...')
+    if (userStore.userId && currentChatSession.value) {
+      console.log('🔗 加入聊天:', { companionId, userId: userStore.userId, chatSessionId: currentChatSession.value.id })
+      joinChat(companionId, userStore.userId, currentChatSession.value.id)
+    }
   })
   
   // 监听消息确认
@@ -217,8 +231,13 @@ const sendMessage = async () => {
   isLoading.value = true
   
   try {
-    // 通过WebSocket发送消息
-    sendSocketMessage(message)
+    // 通过WebSocket发送消息，传递当前会话ID
+    console.log('🔍 发送消息调试信息:', {
+      message,
+      currentChatSession: currentChatSession.value,
+      sessionId: currentChatSession.value?.id
+    })
+    sendSocketMessage(message, currentChatSession.value?.id)
   } catch (error) {
     console.error('发送失败:', error)
     alert('消息发送失败,请重试')
@@ -358,21 +377,6 @@ onBeforeUnmount(() => {
             >
               <p class="text-sm leading-relaxed whitespace-pre-wrap">{{ msg.content }}</p>
               
-              <!-- 点赞/点踩按钮 -->
-              <div v-if="msg.role === 'assistant'" class="flex space-x-2 mt-2">
-                <button
-                  @click="feedback(msg, 1)"
-                  class="flex items-center px-3 py-1 text-sm font-medium text-green-600 bg-green-100 rounded-lg hover:bg-green-200 transition-all"
-                >
-                  👍
-                </button>
-                <button
-                  @click="feedback(msg, -1)"
-                  class="flex items-center px-3 py-1 text-sm font-medium text-red-600 bg-red-100 rounded-lg hover:bg-red-200 transition-all"
-                >
-                  👎
-                </button>
-              </div>
             </div>
           </div>
 

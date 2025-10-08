@@ -1,18 +1,19 @@
 <script setup lang="ts">
 import { RouterView } from 'vue-router'
 import { onMounted } from 'vue'
-import { useAuthStore } from '@/stores/auth'
 
-const authStore = useAuthStore()
+console.log('🎯 App.vue 组件开始渲染')
 
 onMounted(() => {
-  // 从localStorage恢复用户状态
-  authStore.init()
+  console.log('✅ App.vue 组件已挂载')
 })
 </script>
 
 <template>
-  <RouterView />
+  <div>
+    <p>App.vue 正在渲染...</p>
+    <RouterView />
+  </div>
 </template>
 
 <style scoped>

@@ -4,11 +4,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from app.core.database import get_db
+from app.core.database import async_session_maker
 from app.core.auth import verify_password, get_password_hash, create_access_token
 from app.models.user import User
 from app.api.schemas_auth import UserCreate, UserLogin, Token, UserResponse
-from app.api.dependencies import get_current_active_user
+from app.api.dependencies import get_current_active_user, get_async_session
 import logging
 
 logger = logging.getLogger("auth_api")
@@ -19,7 +19,7 @@ router = APIRouter(prefix="/auth", tags=["authentication"])
 @router.post("/register", response_model=Token)
 async def register(
     user_data: UserCreate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_async_session)
 ):
     """
     用户注册
@@ -59,7 +59,7 @@ async def register(
     await db.refresh(new_user)
 
     # 生成token
-    access_token = create_access_token(data={"sub": new_user.id})
+    access_token = create_access_token(data={"sub": str(new_user.id)})
 
     logger.info(f"用户注册成功: {new_user.username} (ID: {new_user.id})")
 
@@ -72,7 +72,7 @@ async def register(
 @router.post("/login", response_model=Token)
 async def login(
     login_data: UserLogin,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_async_session)
 ):
     """
     用户登录
@@ -100,7 +100,7 @@ async def login(
         )
 
     # 生成token
-    access_token = create_access_token(data={"sub": user.id})
+    access_token = create_access_token(data={"sub": str(user.id)})
 
     logger.info(f"用户登录成功: {user.username} (ID: {user.id})")
 

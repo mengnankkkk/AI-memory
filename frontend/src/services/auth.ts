@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const API_BASE_URL = 'http://localhost:8000/api'
+const API_BASE_URL = '/api'
 
 // 创建axios实例
 const api = axios.create({
@@ -8,13 +8,18 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: false, // 确保不会发送cookies
 })
 
 // 请求拦截器 - 自动添加token
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token')
   if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+    // 直接设置headers对象
+    config.headers = {
+      ...config.headers,
+      'Authorization': `Bearer ${token}`
+    }
   }
   return config
 })
@@ -24,10 +29,14 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token过期或无效，清除本地存储并跳转登录
+      // Token过期或无效，清除本地存储
       localStorage.removeItem('access_token')
       localStorage.removeItem('user')
-      window.location.href = '/login'
+      
+      // 避免无限循环：只在非登录页面时跳转
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(error)
   }

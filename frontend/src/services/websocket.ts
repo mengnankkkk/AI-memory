@@ -23,6 +23,7 @@ export const useWebSocketChat = () => {
   const isConnected = ref(false)
   const isConnecting = ref(false)
   const currentStreamingMessage = ref<StreamingMessage | null>(null)
+  const autoJoinCallback = ref<(() => void) | null>(null)
   
   // 连接到WebSocket服务器
   const connect = () => {
@@ -45,6 +46,13 @@ export const useWebSocketChat = () => {
       console.log('✅ WebSocket连接成功')
       isConnected.value = true
       isConnecting.value = false
+      
+      // 如果有自动加入回调，执行它
+      if (autoJoinCallback.value) {
+        setTimeout(() => {
+          autoJoinCallback.value?.()
+        }, 500)
+      }
     })
     
     socket.value.on('disconnect', () => {
@@ -84,11 +92,18 @@ export const useWebSocketChat = () => {
   }
   
   // 发送消息
-  const sendMessage = (message: string) => {
+  const sendMessage = (message: string, sessionId?: number) => {
     if (!socket.value?.connected) return
     
+    console.log('🔍 WebSocket发送消息:', {
+      message,
+      sessionId,
+      connected: socket.value?.connected
+    })
+    
     socket.value.emit('send_message', {
-      message: message
+      message: message,
+      session_id: sessionId
     })
   }
   
@@ -164,6 +179,11 @@ export const useWebSocketChat = () => {
     socket.value.removeAllListeners('chat_joined')
   }
   
+  // 设置自动加入回调
+  const setAutoJoinCallback = (callback: () => void) => {
+    autoJoinCallback.value = callback
+  }
+  
   return {
     // 状态
     isConnected: computed(() => isConnected.value),
@@ -175,6 +195,7 @@ export const useWebSocketChat = () => {
     disconnect,
     joinChat,
     sendMessage,
+    setAutoJoinCallback,
     
     // 事件监听
     onMessageReceived,

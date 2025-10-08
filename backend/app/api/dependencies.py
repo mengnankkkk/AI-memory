@@ -5,16 +5,24 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from app.core.database import get_db
+from app.core.database import async_session_maker
 from app.core.auth import decode_access_token
 from app.models.user import User
 
 security = HTTPBearer()
 
 
+async def get_async_session():
+    """获取异步数据库会话"""
+    async with async_session_maker() as session:
+        try:
+            yield session
+        finally:
+            await session.close()
+
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_async_session)
 ) -> User:
     """
     获取当前登录用户
@@ -32,8 +40,14 @@ async def get_current_user(
     if payload is None:
         raise credentials_exception
 
-    user_id: int = payload.get("sub")
-    if user_id is None:
+    user_id_str = payload.get("sub")
+    if user_id_str is None:
+        raise credentials_exception
+    
+    # 将字符串转换为整数
+    try:
+        user_id: int = int(user_id_str)
+    except (ValueError, TypeError):
         raise credentials_exception
 
     # 从数据库获取用户

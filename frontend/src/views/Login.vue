@@ -1,7 +1,8 @@
 <template>
   <div class="login-container">
     <div class="login-card">
-      <h1 class="login-title">{{ isRegisterMode ? '注册账号' : '登录' }}</h1>
+      <h1 class="login-title">测试页面 - {{ isRegisterMode ? '注册账号' : '登录' }}</h1>
+      <p>如果你能看到这个页面，说明 Vue 路由正常工作！</p>
 
       <form @submit.prevent="handleSubmit" class="login-form">
         <div class="form-group">
@@ -76,12 +77,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
+console.log('🔐 Login.vue 组件开始渲染')
+
 const router = useRouter()
 const authStore = useAuthStore()
+
+onMounted(() => {
+  console.log('✅ Login.vue 组件已挂载')
+})
 
 const isRegisterMode = ref(false)
 const loading = ref(false)

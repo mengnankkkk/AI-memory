@@ -2,7 +2,7 @@
 聊天会话管理API
 支持用户隔离和历史会话管理
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, desc
 from sqlalchemy.orm import selectinload
@@ -26,7 +26,7 @@ async def get_user_companions(
     """获取用户的所有AI伙伴"""
     try:
         # 查询用户的伙伴，包含会话统计
-        stmt = select(Companion).where(Companion.user_id == user_id)
+        stmt = select(Companion).where(Companion.user_id == int(user_id))  # 转换为整数
         result = await db.execute(stmt)
         companions = result.scalars().all()
         
@@ -63,15 +63,19 @@ async def create_chat_session(
 ):
     """创建新的聊天会话"""
     try:
-        # 验证伙伴是否属于该用户
+        # 验证伙伴是否存在（允许系统预设伙伴）
         companion_stmt = select(Companion).where(
-            and_(Companion.id == session_data.companion_id, Companion.user_id == session_data.user_id)
+            Companion.id == session_data.companion_id
         )
         companion_result = await db.execute(companion_stmt)
         companion = companion_result.scalar_one_or_none()
         
         if not companion:
-            raise HTTPException(status_code=404, detail="AI伙伴不存在或不属于该用户")
+            raise HTTPException(status_code=404, detail="AI伙伴不存在")
+        
+        # 检查权限：要么是用户自己的伙伴，要么是系统预设伙伴
+        if companion.user_id != session_data.user_id and companion.user_id != 1:
+            raise HTTPException(status_code=403, detail="无权访问该AI伙伴")
         
         # 创建会话
         session = ChatSession(
@@ -100,7 +104,7 @@ async def get_user_chat_sessions(
     """获取用户的聊天会话历史"""
     try:
         stmt = select(ChatSession).where(
-            and_(ChatSession.user_id == user_id, ChatSession.is_active == True)
+            and_(ChatSession.user_id == int(user_id), ChatSession.is_active == True)  # 转换为整数
         )
         
         if companion_id:
@@ -118,7 +122,7 @@ async def get_user_chat_sessions(
 @router.get("/{session_id}/messages", response_model=ChatHistoryResponse)
 async def get_chat_history(
     session_id: int,
-    user_id: str,
+    user_id: str = Query(..., description="用户ID"),
     db: AsyncSession = Depends(get_db)
 ):
     """获取特定会话的完整聊天历史"""
@@ -129,7 +133,7 @@ async def get_chat_history(
         ).where(
             and_(
                 ChatSession.id == session_id,
-                ChatSession.user_id == user_id
+                ChatSession.user_id == int(user_id)  # 转换为整数
             )
         )
         
@@ -154,8 +158,8 @@ async def get_chat_history(
 @router.post("/{session_id}/messages", response_model=ChatMessageResponse)
 async def add_message_to_session(
     session_id: int,
-    user_id: str,
     message_data: ChatMessageCreate,
+    user_id: str = Query(..., description="用户ID"),
     db: AsyncSession = Depends(get_db)
 ):
     """向会话添加消息"""
@@ -164,7 +168,7 @@ async def add_message_to_session(
         session_stmt = select(ChatSession).where(
             and_(
                 ChatSession.id == session_id,
-                ChatSession.user_id == user_id,
+                ChatSession.user_id == int(user_id),  # 转换为整数
                 ChatSession.is_active == True
             )
         )
@@ -200,7 +204,7 @@ async def add_message_to_session(
 @router.delete("/{session_id}")
 async def delete_chat_session(
     session_id: int,
-    user_id: str,
+    user_id: str = Query(..., description="用户ID"),
     db: AsyncSession = Depends(get_db)
 ):
     """删除聊天会话（软删除）"""
@@ -209,7 +213,7 @@ async def delete_chat_session(
         stmt = select(ChatSession).where(
             and_(
                 ChatSession.id == session_id,
-                ChatSession.user_id == user_id
+                ChatSession.user_id == int(user_id)  # 转换为整数
             )
         )
         

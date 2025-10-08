@@ -33,4 +33,4 @@ echo "🌐 启动FastAPI服务器..."
 echo "API文档: http://localhost:8000/docs"
 echo ""
 
-python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+python -m uvicorn app.main:socket_app --reload --host 0.0.0.0 --port 8000

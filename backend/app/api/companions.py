@@ -40,7 +40,7 @@ async def get_system_companions(
     return [
         AuthCompanionResponse(
             id=c.id,
-            user_id=c.user_id,
+            user_id=str(c.user_id),  # 转换为字符串
             name=c.name,
             avatar_id=c.avatar_id,
             personality_archetype=c.personality_archetype,
@@ -73,11 +73,12 @@ async def get_user_companions(
     return [
         AuthCompanionResponse(
             id=c.id,
-            user_id=current_user.id,
+            user_id=str(current_user.id),  # 转换为字符串
             name=c.name,
             avatar_id=c.avatar_id,
             personality_archetype=c.personality_archetype,
             custom_greeting=c.custom_greeting,
+            description=getattr(c, 'description', ''),
             created_at=c.created_at
         )
         for c in companions
@@ -130,7 +131,7 @@ async def create_companion(
 
     return AuthCompanionResponse(
         id=new_companion.id,
-        user_id=current_user.id,
+        user_id=str(current_user.id),  # 转换为字符串
         name=new_companion.name,
         avatar_id=new_companion.avatar_id,
         personality_archetype=new_companion.personality_archetype,
@@ -160,6 +161,7 @@ async def get_companion(
         return CompanionResponse(**json.loads(cached))
 
     # 从数据库获取
+    # 首先尝试获取用户自己的伙伴
     result = await db.execute(
         select(Companion).where(
             Companion.id == companion_id,
@@ -167,6 +169,16 @@ async def get_companion(
         )
     )
     companion = result.scalar_one_or_none()
+    
+    # 如果没找到，尝试获取系统预设伙伴（user_id=1）
+    if not companion:
+        result = await db.execute(
+            select(Companion).where(
+                Companion.id == companion_id,
+                Companion.user_id == 1  # 系统预设伙伴
+            )
+        )
+        companion = result.scalar_one_or_none()
 
     if not companion:
         raise HTTPException(
@@ -178,11 +190,12 @@ async def get_companion(
 
     resp = CompanionResponse(
         id=companion.id,
-        user_id=companion.user_id,
+        user_id=str(companion.user_id),  # 转换为字符串
         name=companion.name,
         avatar_id=companion.avatar_id,
         personality_archetype=companion.personality_archetype,
         custom_greeting=companion.custom_greeting,
+        description=getattr(companion, 'description', ''),
         greeting=greeting,
         prompt_version=getattr(companion, 'prompt_version', 'v1')
     )

@@ -28,10 +28,15 @@ if not exist ".env" (
 
 echo ✓ 准备完成!
 echo ================================
+
+REM 初始化Redis配置
+echo 🔧 初始化Redis配置...
+python init_redis_config.py
+
 echo 🌐 启动FastAPI服务器...
 echo API文档: http://localhost:8000/docs
 echo.
 
-python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+python -m uvicorn app.main:socket_app --reload --host 0.0.0.0 --port 8000
 
 pause

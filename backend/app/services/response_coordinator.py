@@ -17,7 +17,7 @@ from app.services.affinity_engine import affinity_engine, EmotionAnalysis, Proce
 from app.services.emotion_expression_generator import emotion_expression_generator, EmotionExpression
 from app.services.dynamic_prompt_builder import dynamic_prompt_builder
 from app.services.llm.factory import llm_service
-from app.services.memory_integration import memory_integration
+from app.services.memory_integration import memory_system
 
 logger = logging.getLogger("response_coordinator")
 
@@ -282,15 +282,15 @@ class ResponseCoordinator:
         """
         try:
             # 查询相关记忆（L2）
-            memories = await memory_integration.query_relevant_memories(
+            memories = await memory_system.get_recent_memories(
                 user_id=user_id,
                 companion_id=companion_id,
-                query_text=user_message,
+                query=user_message,
                 limit=5
             )
 
             # 获取用户事实（L3）
-            user_facts = await memory_integration.get_user_facts(
+            user_facts = await memory_system.get_user_facts(
                 user_id=user_id,
                 companion_id=companion_id
             )
@@ -316,13 +316,11 @@ class ResponseCoordinator:
     ):
         """存储重要记忆"""
         try:
-            await memory_integration.store_conversation(
+            await memory_system.save_memory(
                 user_id=user_id,
                 companion_id=companion_id,
-                user_message=user_message,
-                ai_response=ai_response,
-                emotion_type=emotion_analysis.primary_emotion,
-                is_important=emotion_analysis.is_memorable
+                memory_text=f"用户: {user_message}\nAI: {ai_response}",
+                memory_type="conversation"
             )
             self.logger.info("💾 记忆存储成功")
         except Exception as e:

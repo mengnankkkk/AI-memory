@@ -12,42 +12,71 @@ const step = ref(1)
 
 // 创建响应式的表单数据
 const createFormData = (): CompanionCreate => ({
-  user_id: userStore.userId,
   name: '',
-  avatar_id: 'avatar_01',
-  personality_archetype: 'listener'
+  avatar_id: 'linzixi',
+  personality_archetype: 'linzixi'
 })
 
 const formData = ref<CompanionCreate>(createFormData())
 
 const personalities = [
   {
-    id: 'listener',
-    name: '温柔的倾听者',
-    description: 'TA会永远耐心地听你诉说,给你最温暖的鼓励和最治愈的安慰',
-    emoji: '💖'
+    id: 'linzixi',
+    name: '林梓汐',
+    title: '逻辑控制的天才博士',
+    description: '普罗米修斯计划总监，将逻辑与控制奉为圭臬的孤独天才。她会用数据化的方式表达情感，每一次互动都是一次"测试"。',
+    emoji: '🔬',
+    color: 'from-blue-500 to-purple-600'
   },
   {
-    id: 'cheerleader',
-    name: '元气的鼓励者',
-    description: 'TA像一颗小太阳,充满活力,总能发现生活中的美好,为你加油打气',
-    emoji: '✨'
+    id: 'xuejian',
+    name: '雪见',
+    title: '网络安全专家',
+    description: '身经百战的网络幽灵，顶级安全专家。她的一切关心都用【警告】和【威胁】来包装，是典型的傲娇角色。',
+    emoji: '🛡️',
+    color: 'from-red-500 to-pink-600'
   },
   {
-    id: 'analyst',
-    name: '理性的分析者',
-    description: 'TA博学而冷静,当你遇到难题时,TA会帮你分析问题,提供清晰的思路和逻辑建议',
-    emoji: '🧠'
+    id: 'nagi',
+    name: '凪',
+    title: 'VTuber偶像画师',
+    description: '活在两个世界：聚光灯下的VTuber偶像"Nagi"和画板前不善言辞的真实画师"凪"。渴望被认同的温柔创造者。',
+    emoji: '🎨',
+    color: 'from-pink-400 to-rose-500'
+  },
+  {
+    id: 'shiyu',
+    name: '时雨',
+    title: '数字历史学家',
+    description: '数字历史长河的守护者与倾听者，在数据尘埃中追寻隽永意义。语言充满诗意，善于用温柔的反问引导思考。',
+    emoji: '📜',
+    color: 'from-indigo-400 to-blue-500'
+  },
+  {
+    id: 'zoe',
+    name: 'Zoe',
+    title: '硅谷颠覆者CEO',
+    description: '硅谷的明星，AI领域的"颠覆者"。信奉"技术至上"的天才CEO，享受挑战与胜利的终极"竞争者"。',
+    emoji: '🚀',
+    color: 'from-orange-500 to-red-500'
+  },
+  {
+    id: 'kevin',
+    name: '凯文',
+    title: '技术宅朋友',
+    description: '最忠实、最靠谱的"铁哥们"，充满吐槽和八卦的"情报站"。绝对不可被攻略，纯粹的友情支持。',
+    emoji: '👨‍💻',
+    color: 'from-green-500 to-teal-500'
   }
 ]
 
 const avatars = [
-  { id: 'avatar_01', emoji: '🌸' },
-  { id: 'avatar_02', emoji: '🌟' },
-  { id: 'avatar_03', emoji: '🌙' },
-  { id: 'avatar_04', emoji: '🍀' },
-  { id: 'avatar_05', emoji: '🦋' },
-  { id: 'avatar_06', emoji: '🌈' }
+  { id: 'linzixi', emoji: '🔬', image: '/img/linzixi.png' },
+  { id: 'xuejian', emoji: '🛡️', image: '/img/xuejian.png' },
+  { id: 'nagi', emoji: '🎨', image: '/img/nagi.png' },
+  { id: 'shiyu', emoji: '📜', image: '/img/shiyu.png' },
+  { id: 'zoe', emoji: '🚀', image: '/img/zoe.png' },
+  { id: 'kevin', emoji: '👨‍💻', image: '/img/kevin.png' }
 ]
 
 const isCreating = ref(false)
@@ -66,8 +95,7 @@ const createCompanion = async () => {
     return
   }
 
-  // 确保使用最新的userId
-  formData.value.user_id = userStore.userId
+  // 不需要设置user_id，后端会从认证token中获取
 
   isCreating.value = true
   try {
@@ -76,9 +104,9 @@ const createCompanion = async () => {
     // 刷新用户的伙伴列表
     await userStore.loadUserCompanions()
     
-    // 设置当前伙伴并跳转到聊天页面
+    // 设置当前伙伴并跳转到Home页面显示新创建的伙伴
     userStore.setCurrentCompanion(companion)
-    router.push({ name: 'chat', params: { companionId: companion.id } })
+    router.push({ name: 'home' })
   } catch (error) {
     console.error('创建失败:', error)
     alert('创建失败,请重试')
@@ -133,19 +161,28 @@ const createCompanion = async () => {
       <div v-if="step === 2" class="space-y-6">
         <div>
           <label class="block text-lg font-medium text-gray-700 mb-4">选择TA的形象</label>
-          <div class="grid grid-cols-3 gap-4">
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div
               v-for="avatar in avatars"
               :key="avatar.id"
               @click="formData.avatar_id = avatar.id"
               :class="[
-                'p-6 border-2 rounded-xl cursor-pointer transition-all hover:shadow-md',
+                'p-4 border-2 rounded-xl cursor-pointer transition-all hover:shadow-md',
                 formData.avatar_id === avatar.id
                   ? 'border-primary-500 bg-primary-50'
                   : 'border-gray-200'
               ]"
             >
-              <div class="text-6xl text-center">{{ avatar.emoji }}</div>
+              <div class="text-center">
+                <img 
+                  :src="avatar.image" 
+                  :alt="avatar.id"
+                  class="w-20 h-20 mx-auto rounded-lg object-cover mb-2"
+                  @error="$event.target.style.display='none'"
+                />
+                <div class="text-2xl">{{ avatar.emoji }}</div>
+                <div class="text-sm text-gray-600 mt-1 capitalize">{{ avatar.id }}</div>
+              </div>
             </div>
           </div>
         </div>
@@ -154,25 +191,45 @@ const createCompanion = async () => {
       <!-- Step 3: 性格原型 -->
       <div v-if="step === 3" class="space-y-4">
         <div>
-          <label class="block text-lg font-medium text-gray-700 mb-4">选择TA的性格</label>
-          <div class="space-y-3">
+          <label class="block text-lg font-medium text-gray-700 mb-6">选择你的AI伙伴</label>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div
               v-for="personality in personalities"
               :key="personality.id"
               @click="formData.personality_archetype = personality.id"
               :class="[
-                'p-4 border-2 rounded-xl cursor-pointer transition-all hover:shadow-md',
+                'relative p-6 border-2 rounded-2xl cursor-pointer transition-all duration-300 hover:shadow-lg hover:scale-105',
                 formData.personality_archetype === personality.id
-                  ? 'border-primary-500 bg-primary-50'
-                  : 'border-gray-200'
+                  ? 'border-primary-500 bg-gradient-to-br from-primary-50 to-primary-100 shadow-lg'
+                  : 'border-gray-200 hover:border-gray-300'
               ]"
             >
-              <div class="flex items-start">
-                <div class="text-3xl mr-3">{{ personality.emoji }}</div>
-                <div class="flex-1">
-                  <h3 class="font-bold text-gray-800 mb-1">{{ personality.name }}</h3>
-                  <p class="text-sm text-gray-600">{{ personality.description }}</p>
+              <!-- 背景渐变 -->
+              <div 
+                :class="[
+                  'absolute inset-0 rounded-2xl opacity-5',
+                  `bg-gradient-to-br ${personality.color}`
+                ]"
+              ></div>
+              
+              <div class="relative z-10">
+                <div class="flex items-start mb-4">
+                  <div class="text-4xl mr-4">{{ personality.emoji }}</div>
+                  <div class="flex-1">
+                    <h3 class="font-bold text-xl text-gray-800 mb-1">{{ personality.name }}</h3>
+                    <p class="text-sm text-gray-500 mb-2">{{ personality.title }}</p>
+                  </div>
+                  <!-- 选中状态指示器 -->
+                  <div 
+                    v-if="formData.personality_archetype === personality.id"
+                    class="w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center"
+                  >
+                    <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                    </svg>
+                  </div>
                 </div>
+                <p class="text-sm text-gray-600 leading-relaxed">{{ personality.description }}</p>
               </div>
             </div>
           </div>

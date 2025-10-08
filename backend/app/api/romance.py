@@ -35,7 +35,7 @@ async def get_companion_state(
         # 验证伙伴是否存在且属于该用户
         stmt = select(Companion).where(
             Companion.id == companion_id,
-            Companion.user_id == user_id
+            Companion.user_id == int(user_id)  # 转换为整数
         )
         result = await db.execute(stmt)
         companion = result.scalar_one_or_none()
@@ -134,7 +134,7 @@ async def trigger_random_event(
         # 验证伙伴是否存在
         stmt = select(Companion).where(
             Companion.id == companion_id,
-            Companion.user_id == user_id
+            Companion.user_id == int(user_id)  # 转换为整数
         )
         result = await db.execute(stmt)
         companion = result.scalar_one_or_none()
@@ -178,7 +178,7 @@ async def get_pending_events(
         # 验证伙伴是否存在
         stmt = select(Companion).where(
             Companion.id == companion_id,
-            Companion.user_id == user_id
+            Companion.user_id == int(user_id)  # 转换为整数
         )
         result = await db.execute(stmt)
         companion = result.scalar_one_or_none()
@@ -267,7 +267,7 @@ async def get_daily_tasks(
         # 验证伙伴是否存在
         stmt = select(Companion).where(
             Companion.id == companion_id,
-            Companion.user_id == user_id
+            Companion.user_id == int(user_id)  # 转换为整数
         )
         result = await db.execute(stmt)
         companion = result.scalar_one_or_none()

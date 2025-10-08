@@ -14,6 +14,8 @@ from app.api.notification import router as notification_router
 from app.api.stats import router as stats_router
 from app.api.romance import router as romance_router
 from app.api.auth import router as auth_router  # 用户认证路由
+from app.api.offline_life import router as offline_life_router  # 离线生活路由
+from app.services.timeline_scheduler import timeline_scheduler  # 时间线调度器
 import socketio
 
 @asynccontextmanager
@@ -25,8 +27,14 @@ async def lifespan(app: FastAPI):
     await init_db()
     print("[OK] 数据库初始化完成")
 
+    # 启动时间线调度器
+    await timeline_scheduler.start()
+    print("[OK] 时间线调度器已启动")
+
     yield
 
+    # 停止时间线调度器
+    await timeline_scheduler.stop()
     print("[SHUTDOWN] AI灵魂伙伴正在关闭...")
 
 # 创建 FastAPI 应用
@@ -57,6 +65,7 @@ app.include_router(export_router, prefix="/api")
 app.include_router(notification_router, prefix="/api")
 app.include_router(stats_router, prefix="/api")
 app.include_router(romance_router, prefix="/api")
+app.include_router(offline_life_router, prefix="/api")  # 离线生活路由
 
 # 创建 Socket.IO 服务器
 sio = socketio.AsyncServer(

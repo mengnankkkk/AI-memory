@@ -6,8 +6,9 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { Companion } from '@/types'
 import api from '@/services/auth'
+import { useAuthStore } from './auth'
 
-interface ChatSession {
+export interface ChatSession {
   id: number
   user_id: string
   companion_id: number
@@ -26,16 +27,13 @@ interface ChatMessage {
 }
 
 export const useUserStore = defineStore('user', () => {
-  // 用户ID（简单的UUID生成）
-  const userId = ref<string>(
-    localStorage.getItem('ai_companion_user_id') || 
-    'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
-  )
-
-  // 保存用户ID到本地存储
-  if (!localStorage.getItem('ai_companion_user_id')) {
-    localStorage.setItem('ai_companion_user_id', userId.value)
-  }
+  // 获取认证store
+  const authStore = useAuthStore()
+  
+  // 用户ID（从认证store获取）
+  const userId = computed(() => {
+    return authStore.user?.id?.toString() || ''
+  })
 
   // 用户的AI伙伴列表
   const companions = ref<Companion[]>([])
@@ -59,8 +57,8 @@ export const useUserStore = defineStore('user', () => {
   // 获取用户的所有AI伙伴
   async function loadUserCompanions() {
     try {
-      const data = await api.get('/companions/')
-      companions.value = data
+      const response = await api.get('/companions/')
+      companions.value = response.data
     } catch (error) {
       console.error('加载AI伙伴失败:', error)
     }
@@ -74,22 +72,23 @@ export const useUserStore = defineStore('user', () => {
         url += `?companion_id=${companionId}`
       }
 
-      const data = await api.get(url)
-      chatSessions.value = data
+      const response = await api.get(url)
+      chatSessions.value = response.data
     } catch (error) {
       console.error('加载聊天历史失败:', error)
     }
   }
 
   // 创建新的聊天会话
-  async function createChatSession(companionId: number, title?: string) {
+  async function createChatSession(companionId: number, title?: string): Promise<ChatSession | null> {
     try {
-      const session = await api.post('/sessions/', {
+      const response = await api.post('/sessions/', {
         companion_id: companionId,
         user_id: userId.value,
         session_title: title
       })
 
+      const session = response.data
       currentSession.value = session
       chatSessions.value.unshift(session)
       return session
@@ -102,8 +101,8 @@ export const useUserStore = defineStore('user', () => {
   // 加载聊天消息
   async function loadChatMessages(sessionId: number) {
     try {
-      const data = await api.get(`/sessions/${sessionId}/messages`)
-      chatMessages.value = data.messages || []
+      const response = await api.get(`/sessions/${sessionId}/messages?user_id=${userId.value}`)
+      chatMessages.value = response.data.messages || []
     } catch (error) {
       console.error('加载聊天消息失败:', error)
     }
@@ -148,7 +147,7 @@ export const useUserStore = defineStore('user', () => {
     userId: computed(() => userId.value),
     companions: computed(() => companions.value),
     currentCompanion: computed(() => currentCompanion.value),
-    chatSessions: computed(() => chatSessions.value),
+    chatSessions,
     currentSession: computed(() => currentSession.value),
     chatMessages: computed(() => chatMessages.value),
     

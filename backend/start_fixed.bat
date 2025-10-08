@@ -34,4 +34,4 @@ echo   API Docs: http://localhost:8000/docs
 echo ========================================
 echo.
 
-python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+python -m uvicorn app.main:socket_app --reload --host 0.0.0.0 --port 8000

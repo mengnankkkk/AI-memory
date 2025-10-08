@@ -20,6 +20,7 @@ class CompanionResponse(BaseModel):
     avatar_id: str
     personality_archetype: str
     custom_greeting: Optional[str]
+    description: Optional[str] = None
     greeting: str  # 生成的问候语
     prompt_version: Optional[str] = "v1"
 

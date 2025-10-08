@@ -11,7 +11,6 @@ export interface Companion {
 }
 
 export interface CompanionCreate {
-  user_id: string
   name: string
   avatar_id: string
   personality_archetype: string

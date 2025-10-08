@@ -49,7 +49,7 @@ class CompanionCreate(BaseModel):
 class CompanionResponse(BaseModel):
     """伙伴响应"""
     id: int
-    user_id: int
+    user_id: str
     name: str
     avatar_id: str
     personality_archetype: str

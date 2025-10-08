@@ -1,7 +1,7 @@
 /**
  * 系统配置和统计API服务
  */
-import apiClient from './api'
+import apiClient from './auth'
 
 export interface ConfigItem {
   key: string
@@ -41,64 +41,64 @@ export const configService = {
   // 配置管理
   async getAllConfigs() {
     const response = await apiClient.get('/config/all')
-    return response.data.configs
+    return response.configs
   },
 
   async getConfig(key: string) {
     const response = await apiClient.get(`/config/${key}`)
-    return response.data
+    return response
   },
 
   async setConfig(key: string, value: any, ttl?: number) {
     const response = await apiClient.post(`/config/${key}`, { value, ttl })
-    return response.data
+    return response
   },
 
   async deleteConfig(key: string) {
     const response = await apiClient.delete(`/config/${key}`)
-    return response.data
+    return response
   },
 
   // 统计数据
   async getStatsOverview(): Promise<StatsOverview> {
     const response = await apiClient.get('/stats/overview')
-    return response.data
+    return response
   },
 
   async getMetricHistory(metric: string, days: number = 7): Promise<MetricHistory> {
     const response = await apiClient.get(`/stats/metrics/${metric}?days=${days}`)
-    return response.data
+    return response
   },
 
   async getPerformanceStats(): Promise<PerformanceStats> {
     const response = await apiClient.get('/stats/performance')
-    return response.data
+    return response
   },
 
   async getPromptUsageStats() {
     const response = await apiClient.get('/stats/prompt-usage')
-    return response.data
+    return response
   },
 
   async getActiveSessionsStats() {
     const response = await apiClient.get('/stats/active-sessions')
-    return response.data
+    return response
   },
 
   // A/B 测试管理
   async getPromptVersions() {
     const response = await apiClient.get('/ab-test/prompt-versions')
-    return response.data
+    return response
   },
 
   async switchPromptVersion(companionId: number, version: string) {
     const response = await apiClient.post(`/ab-test/switch-prompt/${companionId}`, { version })
-    return response.data
+    return response
   },
 
   async getABTestResults(testName: string, days: number = 7) {
     const response = await apiClient.get(`/ab-test/results/${testName}?days=${days}`)
-    return response.data
+    return response
   },
 
   // 通知管理
@@ -110,12 +110,12 @@ export const configService = {
       content,
       data
     })
-    return response.data
+    return response
   },
 
   async getUnreadNotifications(userId: number) {
     const response = await apiClient.get(`/notification/unread/${userId}`)
-    return response.data
+    return response
   },
 
   // 数据导出
@@ -135,13 +135,13 @@ export const configService = {
     const response = await apiClient.get(`/export/conversations/csv?${queryParams}`, {
       responseType: 'blob'
     })
-    return response.data
+    return response
   },
 
   async exportUserData(userId: number) {
     const response = await apiClient.get(`/export/user-data/${userId}`, {
       responseType: 'blob'
     })
-    return response.data
+    return response
   }
 }

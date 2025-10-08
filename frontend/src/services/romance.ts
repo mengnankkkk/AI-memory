@@ -1,6 +1,7 @@
 /**
  * 恋爱攻略系统 API 服务
  */
+import api from './auth'
 import type {
   CompanionStateResponse,
   GiftRequest,
@@ -15,110 +16,63 @@ import type {
   CompanionChatContextResponse
 } from '@/types/romance'
 
-const API_BASE = '/api/romance'
+const API_BASE = '/romance'
 
 class RomanceApi {
   /**
    * 获取伙伴状态
    */
   async getCompanionState(companionId: number, userId: string): Promise<CompanionStateResponse> {
-    const response = await fetch(`${API_BASE}/companion/${companionId}/state?user_id=${userId}`)
-    if (!response.ok) {
-      throw new Error(`获取伙伴状态失败: ${response.statusText}`)
-    }
-    return response.json()
+    const response = await api.get(`${API_BASE}/companion/${companionId}/state?user_id=${userId}`)
+    return response
   }
 
   /**
    * 赠送礼物
    */
   async giveGift(companionId: number, giftRequest: GiftRequest): Promise<GiftResponse> {
-    const response = await fetch(`${API_BASE}/companion/${companionId}/gift`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(giftRequest)
-    })
-    
-    if (!response.ok) {
-      throw new Error(`赠送礼物失败: ${response.statusText}`)
-    }
-    return response.json()
+    const response = await api.post(`${API_BASE}/companion/${companionId}/gift`, giftRequest)
+    return response
   }
 
   /**
    * 触发随机事件
    */
   async triggerRandomEvent(companionId: number, userId: string): Promise<RandomEventResponse> {
-    const response = await fetch(`${API_BASE}/companion/${companionId}/random-event?user_id=${userId}`, {
-      method: 'POST'
-    })
-    
-    if (!response.ok) {
-      throw new Error(`触发随机事件失败: ${response.statusText}`)
-    }
-    return response.json()
+    const response = await api.post(`${API_BASE}/companion/${companionId}/random-event?user_id=${userId}`)
+    return response
   }
 
   /**
    * 获取待处理事件
    */
   async getPendingEvents(companionId: number, userId: string): Promise<{ events: any[] }> {
-    const response = await fetch(`${API_BASE}/companion/${companionId}/pending-events?user_id=${userId}`)
-    
-    if (!response.ok) {
-      throw new Error(`获取待处理事件失败: ${response.statusText}`)
-    }
-    return response.json()
+    const response = await api.get(`${API_BASE}/companion/${companionId}/pending-events?user_id=${userId}`)
+    return response
   }
 
   /**
    * 分析交互
    */
   async analyzeInteraction(request: InteractionAnalysisRequest): Promise<InteractionAnalysisResponse> {
-    const response = await fetch(`${API_BASE}/companion/${request.companion_id}/analyze-interaction`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(request)
-    })
-    
-    if (!response.ok) {
-      throw new Error(`分析交互失败: ${response.statusText}`)
-    }
-    return response.json()
+    const response = await api.post(`${API_BASE}/companion/${request.companion_id}/analyze-interaction`, request)
+    return response
   }
 
   /**
    * 获取每日任务
    */
   async getDailyTasks(companionId: number, userId: string): Promise<DailyTaskResponse[]> {
-    const response = await fetch(`${API_BASE}/companion/${companionId}/daily-tasks?user_id=${userId}`)
-    
-    if (!response.ok) {
-      throw new Error(`获取每日任务失败: ${response.statusText}`)
-    }
-    return response.json()
+    const response = await api.get(`${API_BASE}/companion/${companionId}/daily-tasks?user_id=${userId}`)
+    return response
   }
 
   /**
    * 完成每日任务
    */
   async completeTask(taskId: string, companionId: number, userId: string): Promise<{ success: boolean; reward: number }> {
-    const response = await fetch(`${API_BASE}/companion/${companionId}/tasks/${taskId}/complete`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ user_id: userId })
-    })
-    
-    if (!response.ok) {
-      throw new Error(`完成任务失败: ${response.statusText}`)
-    }
-    return response.json()
+    const response = await api.post(`${API_BASE}/companion/${companionId}/tasks/${taskId}/complete`, { user_id: userId })
+    return response
   }
 
   /**
@@ -129,17 +83,11 @@ class RomanceApi {
     if (itemType) params.append('item_type', itemType)
     if (rarity) params.append('rarity', rarity)
     
-    const url = `/api/romance/store/items${params.toString() ? '?' + params.toString() : ''}`
-    const response = await fetch(url)
-    
-    if (!response.ok) {
-      throw new Error(`获取商店物品失败: ${response.statusText}`)
-    }
-    
-    const items = await response.json()
+    const url = `${API_BASE}/store/items${params.toString() ? '?' + params.toString() : ''}`
+    const response = await api.get(url)
     
     // 为礼物添加表情符号
-    return items.map((item: StoreItemResponse) => ({
+    return response.map((item: StoreItemResponse) => ({
       ...item,
       emoji: this.getGiftEmoji(item.item_type)
     }))
@@ -149,48 +97,24 @@ class RomanceApi {
    * 购买物品
    */
   async purchaseItem(itemId: string, userId: string): Promise<{ success: boolean; message: string }> {
-    const response = await fetch(`${API_BASE}/store/purchase`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ item_id: itemId, user_id: userId })
-    })
-    
-    if (!response.ok) {
-      throw new Error(`购买物品失败: ${response.statusText}`)
-    }
-    return response.json()
+    const response = await api.post(`${API_BASE}/store/purchase`, { item_id: itemId, user_id: userId })
+    return response
   }
 
   /**
    * 获取用户货币
    */
   async getUserCurrency(userId: string): Promise<UserCurrencyResponse> {
-    const response = await fetch(`${API_BASE}/user/${userId}/currency`)
-    
-    if (!response.ok) {
-      throw new Error(`获取用户货币失败: ${response.statusText}`)
-    }
-    return response.json()
+    const response = await api.get(`${API_BASE}/user/${userId}/currency`)
+    return response
   }
 
   /**
    * 获取聊天上下文（包含恋爱状态）
    */
   async getChatContext(request: CompanionChatContextRequest): Promise<CompanionChatContextResponse> {
-    const response = await fetch(`${API_BASE}/companion/${request.companion_id}/chat-context`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(request)
-    })
-    
-    if (!response.ok) {
-      throw new Error(`获取聊天上下文失败: ${response.statusText}`)
-    }
-    return response.json()
+    const response = await api.post(`${API_BASE}/companion/${request.companion_id}/chat-context`, request)
+    return response
   }
 
   /**
@@ -203,12 +127,8 @@ class RomanceApi {
     total_interactions: number
     average_affinity: number
   }> {
-    const response = await fetch(`${API_BASE}/user/${userId}/relationship-stats`)
-    
-    if (!response.ok) {
-      throw new Error(`获取关系统计失败: ${response.statusText}`)
-    }
-    return response.json()
+    const response = await api.get(`${API_BASE}/user/${userId}/relationship-stats`)
+    return response
   }
 
   /**
@@ -223,42 +143,26 @@ class RomanceApi {
     max_progress: number
     reward: string
   }[]> {
-    const response = await fetch(`${API_BASE}/user/${userId}/achievements`)
-    
-    if (!response.ok) {
-      throw new Error(`获取成就列表失败: ${response.statusText}`)
-    }
-    return response.json()
+    const response = await api.get(`${API_BASE}/user/${userId}/achievements`)
+    return response
   }
 
   /**
    * 导出关系数据
    */
   async exportRelationshipData(userId: string, companionId: number): Promise<Blob> {
-    const response = await fetch(`${API_BASE}/companion/${companionId}/export?user_id=${userId}`)
-    
-    if (!response.ok) {
-      throw new Error(`导出关系数据失败: ${response.statusText}`)
-    }
-    return response.blob()
+    const response = await api.get(`${API_BASE}/companion/${companionId}/export?user_id=${userId}`, {
+      responseType: 'blob'
+    })
+    return response
   }
 
   /**
    * 重置关系状态（开发用）
    */
   async resetRelationship(companionId: number, userId: string): Promise<{ success: boolean }> {
-    const response = await fetch(`${API_BASE}/companion/${companionId}/reset`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ user_id: userId })
-    })
-    
-    if (!response.ok) {
-      throw new Error(`重置关系状态失败: ${response.statusText}`)
-    }
-    return response.json()
+    const response = await api.post(`${API_BASE}/companion/${companionId}/reset`, { user_id: userId })
+    return response
   }
 
   /**
@@ -286,14 +190,9 @@ class RomanceApi {
    * 获取推荐礼物
    */
   async getRecommendedGifts(companionId: number, userId: string): Promise<StoreItemResponse[]> {
-    const response = await fetch(`${API_BASE}/companion/${companionId}/recommended-gifts?user_id=${userId}`)
+    const response = await api.get(`${API_BASE}/companion/${companionId}/recommended-gifts?user_id=${userId}`)
     
-    if (!response.ok) {
-      throw new Error(`获取推荐礼物失败: ${response.statusText}`)
-    }
-    
-    const items = await response.json()
-    return items.map((item: StoreItemResponse) => ({
+    return response.map((item: StoreItemResponse) => ({
       ...item,
       emoji: this.getGiftEmoji(item.item_type)
     }))
@@ -308,12 +207,8 @@ class RomanceApi {
     interactions: number
     events: string[]
   }[]> {
-    const response = await fetch(`${API_BASE}/companion/${companionId}/history?user_id=${userId}&days=${days}`)
-    
-    if (!response.ok) {
-      throw new Error(`获取关系历史失败: ${response.statusText}`)
-    }
-    return response.json()
+    const response = await api.get(`${API_BASE}/companion/${companionId}/history?user_id=${userId}&days=${days}`)
+    return response
   }
 }
 

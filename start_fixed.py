@@ -108,6 +108,24 @@ def setup_frontend():
 
     print("[OK] 前端环境设置完成")
 
+def init_redis_config():
+    """初始化Redis配置"""
+    os.chdir(BACKEND_DIR)
+    
+    # 获取Python路径
+    if platform.system() == "Windows":
+        python_path = BACKEND_DIR / "venv" / "Scripts" / "python.exe"
+    else:
+        python_path = BACKEND_DIR / "venv" / "bin" / "python"
+    
+    print("[Backend] 初始化Redis配置...")
+    try:
+        subprocess.run([str(python_path), "init_redis_config.py"], check=True)
+        print("[OK] Redis配置初始化完成")
+    except subprocess.CalledProcessError as e:
+        print(f"[WARN] Redis配置初始化失败: {e}")
+        print("      系统设置页面可能显示默认数据")
+
 def start_backend():
     """启动后端服务"""
     os.chdir(BACKEND_DIR)
@@ -154,6 +172,9 @@ def main():
         # 设置环境
         setup_backend()
         setup_frontend()
+
+        # 初始化Redis配置
+        init_redis_config()
 
         # 启动服务
         print_header("启动服务")

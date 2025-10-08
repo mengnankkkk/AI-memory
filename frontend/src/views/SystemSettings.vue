@@ -7,6 +7,31 @@
         <p class="mt-2 text-gray-600">管理系统配置、监控性能指标和查看使用统计</p>
       </div>
 
+      <!-- 加载状态 -->
+      <div v-if="loading" class="flex items-center justify-center py-12">
+        <div class="text-center">
+          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+          <p class="mt-4 text-gray-600">加载系统数据中...</p>
+        </div>
+      </div>
+
+      <!-- 错误提示 -->
+      <div v-if="error && !loading" class="mb-6 bg-yellow-50 border border-yellow-200 rounded-md p-4">
+        <div class="flex">
+          <div class="flex-shrink-0">
+            <svg class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+            </svg>
+          </div>
+          <div class="ml-3">
+            <p class="text-sm text-yellow-800">{{ error }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 主要内容 -->
+      <div v-if="!loading">
+
       <!-- 统计概览卡片 -->
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div class="bg-white rounded-lg shadow p-6">
@@ -83,6 +108,79 @@
             {{ tab.name }}
           </button>
         </nav>
+      </div>
+
+      <!-- 攻略对象管理 -->
+      <div v-if="activeTab === 'companions'" class="bg-white rounded-lg shadow">
+        <div class="p-6">
+          <div class="flex justify-between items-center mb-6">
+            <div>
+              <h3 class="text-lg font-semibold text-gray-900">攻略对象管理</h3>
+              <p class="text-sm text-gray-500 mt-1">所有用户都可以攻略这些AI伙伴，但每个用户的关系进度是独立的</p>
+            </div>
+            <button
+              @click="loadCompanions"
+              :disabled="companionsLoading"
+              class="px-4 py-2 bg-pink-500 text-white rounded-md hover:bg-pink-600 disabled:opacity-50"
+            >
+              {{ companionsLoading ? '加载中...' : '刷新' }}
+            </button>
+          </div>
+
+          <!-- 攻略对象列表 -->
+          <div v-if="systemCompanions.length > 0">
+            <div class="mb-4 flex items-center justify-between">
+              <h4 class="text-md font-medium text-gray-700">可攻略的AI伙伴 ({{ systemCompanions.length }})</h4>
+              <div class="text-sm text-gray-500">
+                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-pink-100 text-pink-800">
+                  💕 每个用户独立攻略
+                </span>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div
+                v-for="companion in systemCompanions"
+                :key="companion.id"
+                @click="startChat(companion)"
+                class="p-6 border-2 border-pink-200 rounded-xl hover:shadow-lg transition-all cursor-pointer hover:border-pink-400 hover:scale-105 bg-gradient-to-br from-pink-50 to-rose-50"
+              >
+                <div class="flex flex-col items-center space-y-4">
+                  <div class="w-16 h-16 bg-gradient-to-br from-pink-400 to-rose-500 rounded-full flex items-center justify-center text-white font-bold text-2xl shadow-lg">
+                    {{ companion.name.charAt(0) }}
+                  </div>
+                  <div class="text-center">
+                    <h5 class="font-bold text-lg text-gray-900 mb-2">{{ companion.name }}</h5>
+                    <p class="text-sm text-gray-600 mb-3">{{ (companion as any).description || '神秘的AI伙伴' }}</p>
+                    <p class="text-xs text-pink-600 italic bg-pink-100 px-3 py-1 rounded-full">
+                      "{{ companion.custom_greeting || '你好！让我们开始这段特别的旅程吧' }}"
+                    </p>
+                  </div>
+                  <div class="w-full">
+                    <div class="flex justify-between text-xs text-gray-500 mb-2">
+                      <span>好感度</span>
+                      <span>独立进度</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                      <div class="bg-gradient-to-r from-pink-400 to-rose-500 h-2 rounded-full" style="width: 20%"></div>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1 text-center">点击开始攻略</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 空状态 -->
+          <div v-if="!companionsLoading && systemCompanions.length === 0" class="text-center py-12">
+            <div class="text-gray-400 mb-4">
+              <svg class="mx-auto h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+              </svg>
+            </div>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">暂无攻略对象</h3>
+            <p class="text-gray-500">系统正在准备攻略对象，请稍后再试</p>
+          </div>
+        </div>
       </div>
 
       <!-- 配置管理 -->
@@ -221,6 +319,7 @@
           </div>
         </div>
       </div>
+      </div>
     </div>
 
     <!-- 添加/编辑配置弹窗 -->
@@ -283,9 +382,12 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { configService, type StatsOverview, type PerformanceStats } from '@/services/config'
+import api from '@/services/auth'
 
 // 响应式数据
-const activeTab = ref('config')
+const activeTab = ref('companions')
+const loading = ref(true)
+const error = ref('')
 const stats = ref<StatsOverview>({ today: {}, trends: {} })
 const performance = ref<PerformanceStats>({
   cache_hit_rate: 0,
@@ -298,6 +400,10 @@ const performance = ref<PerformanceStats>({
 const configs = ref<Record<string, any>>({})
 const promptVersions = ref<{ versions: string[], current_default: string }>({ versions: [], current_default: '' })
 const promptUsageStats = ref<{ prompt_usage: Record<string, number>, total_usage: number }>({ prompt_usage: {}, total_usage: 0 })
+
+// 攻略对象管理相关
+const systemCompanions = ref<any[]>([])
+const companionsLoading = ref(false)
 
 // 表单数据
 const showAddConfig = ref(false)
@@ -318,6 +424,7 @@ const exporting = ref(false)
 
 // 选项卡配置
 const tabs = [
+  { id: 'companions', name: '攻略对象' },
   { id: 'config', name: '配置管理' },
   { id: 'ab-test', name: 'A/B 测试' },
   { id: 'export', name: '数据导出' }
@@ -325,14 +432,81 @@ const tabs = [
 
 // 方法
 const loadData = async () => {
+  loading.value = true
+  error.value = ''
+  
   try {
+    console.log('开始加载系统数据...')
+    
+    // 设置超时时间
+    const timeout = 10000 // 10秒超时
+    
     // 加载统计数据
     const [statsData, performanceData, configsData, versionsData, usageData] = await Promise.all([
-      configService.getStatsOverview(),
-      configService.getPerformanceStats(),
-      configService.getAllConfigs(),
-      configService.getPromptVersions(),
-      configService.getPromptUsageStats()
+      Promise.race([
+        configService.getStatsOverview(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('超时')), timeout))
+      ]).catch((err) => {
+        console.warn('获取统计数据失败:', err)
+        return {
+          today: {
+            sessions_created: 0,
+            messages_processed: 0,
+            successful_responses: 0,
+            error_responses: 0,
+            cache_hits: 0,
+            chat_sessions_joined: 0
+          },
+          trends: {}
+        }
+      }),
+      Promise.race([
+        configService.getPerformanceStats(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('超时')), timeout))
+      ]).catch((err) => {
+        console.warn('获取性能数据失败:', err)
+        return {
+          cache_hit_rate: 0,
+          success_rate: 0,
+          total_requests: 0,
+          cache_hits: 0,
+          successful_responses: 0,
+          error_responses: 0
+        }
+      }),
+      Promise.race([
+        configService.getAllConfigs(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('超时')), timeout))
+      ]).catch((err) => {
+        console.warn('获取配置数据失败:', err)
+        return {
+          system_name: "AI灵魂伙伴",
+          version: "1.0.0",
+          debug_mode: true,
+          max_sessions_per_user: 10,
+          default_prompt_version: "v1"
+        }
+      }),
+      Promise.race([
+        configService.getPromptVersions(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('超时')), timeout))
+      ]).catch((err) => {
+        console.warn('获取提示词版本失败:', err)
+        return {
+          versions: ["v1", "v2"],
+          current_default: "v1"
+        }
+      }),
+      Promise.race([
+        configService.getPromptUsageStats(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('超时')), timeout))
+      ]).catch((err) => {
+        console.warn('获取提示词使用统计失败:', err)
+        return {
+          prompt_usage: {},
+          total_usage: 0
+        }
+      })
     ])
 
     stats.value = statsData
@@ -340,9 +514,85 @@ const loadData = async () => {
     configs.value = configsData
     promptVersions.value = versionsData
     promptUsageStats.value = usageData
-  } catch (error) {
-    console.error('加载数据失败:', error)
+    
+    console.log('系统数据加载完成:', {
+      stats: statsData,
+      performance: performanceData,
+      configs: configsData
+    })
+  } catch (err) {
+    console.error('加载数据失败:', err)
+    error.value = '加载系统数据失败，显示默认配置'
+    
+    // 设置默认值
+    stats.value = {
+      today: {
+        sessions_created: 0,
+        messages_processed: 0,
+        successful_responses: 0,
+        error_responses: 0,
+        cache_hits: 0,
+        chat_sessions_joined: 0
+      },
+      trends: {}
+    }
+    performance.value = {
+      cache_hit_rate: 0,
+      success_rate: 0,
+      total_requests: 0,
+      cache_hits: 0,
+      successful_responses: 0,
+      error_responses: 0
+    }
+    configs.value = {
+      system_name: "AI灵魂伙伴",
+      version: "1.0.0",
+      debug_mode: true,
+      max_sessions_per_user: 10,
+      default_prompt_version: "v1"
+    }
+    promptVersions.value = {
+      versions: ["v1", "v2"],
+      current_default: "v1"
+    }
+    promptUsageStats.value = {
+      prompt_usage: {},
+      total_usage: 0
+    }
+  } finally {
+    loading.value = false
   }
+}
+
+// 加载攻略对象数据
+const loadCompanions = async () => {
+  companionsLoading.value = true
+  try {
+    console.log('开始加载攻略对象...')
+    
+    // 设置超时时间
+    const timeout = 5000 // 5秒超时
+    
+    // 只加载系统预设的攻略对象
+    const systemResponse = await Promise.race([
+      api.get('/companions/system'),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('超时')), timeout))
+    ])
+    
+    systemCompanions.value = (systemResponse as any).data || systemResponse
+    console.log('攻略对象加载完成:', systemCompanions.value)
+  } catch (error) {
+    console.error('加载攻略对象失败:', error)
+    systemCompanions.value = []
+  } finally {
+    companionsLoading.value = false
+  }
+}
+
+// 开始攻略
+const startChat = (companion: any) => {
+  // 跳转到聊天页面开始攻略
+  window.location.href = `/#/chat/${companion.id}`
 }
 
 const editConfig = (key: string, value: any) => {
@@ -398,7 +648,8 @@ const exportConversations = async () => {
     if (exportForm.value.startDate) params.startDate = exportForm.value.startDate
     if (exportForm.value.endDate) params.endDate = exportForm.value.endDate
     
-    const blob = await configService.exportConversations(params)
+    const response = await configService.exportConversations(params)
+    const blob = new Blob([response.data], { type: 'text/csv' })
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -434,7 +685,9 @@ const exportStats = async () => {
 
 // 初始化
 onMounted(() => {
+  console.log('SystemSettings页面已挂载，开始加载数据...')
   loadData()
+  loadCompanions()
   // 每30秒刷新一次数据
   setInterval(loadData, 30000)
 })
