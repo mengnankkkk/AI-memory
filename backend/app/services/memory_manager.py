@@ -121,13 +121,14 @@ class SystemPromptGenerator:
         cls,
         companion_name: str,
         personality_type: str,
-        custom_traits: Optional[Dict] = None
+        custom_traits: Optional[Dict] = None,
+        context: Optional[Dict] = None
     ) -> str:
         """生成系统提示词 - 使用prompts.py中定义的角色模板"""
         from app.core.prompts import get_system_prompt
         
         # 使用prompts.py中定义的角色模板
-        prompt = get_system_prompt(companion_name, personality_type)
+        prompt = get_system_prompt(companion_name, personality_type, context)
         
         # 如果有自定义特质，添加到提示词中
         if custom_traits:

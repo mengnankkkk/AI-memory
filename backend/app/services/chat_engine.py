@@ -268,10 +268,15 @@ class ChatEngine:
                 companion_info.get('personality', 'companion')
             )
             
+            # 获取实时情境
+            from app.services.mcp.aggregator import context_aggregator
+            context = await context_aggregator.get_full_context(str(user_id), companion_id)
+
             # 生成系统提示词
             system_prompt = SystemPromptGenerator.generate_system_prompt(
                 companion_name=companion_info['name'],
-                personality_type=companion_info.get('personality', 'companion')
+                personality_type=companion_info.get('personality', 'companion'),
+                context=context
             )
             
             # 获取会话上下文（优先从数据库加载历史）
@@ -347,17 +352,15 @@ class ChatEngine:
 
             # 记录 Prompt 版本使用埋点
             prompt_version = companion_info.get('prompt_version', 'v1')
-            await analytics_service.track_prompt_usage(
-                user_id, 
-                prompt_version, 
-                companion_id,
-                companion_info.get('personality', 'companion')
-            )
-            
+            # 获取实时情境
+            from app.services.mcp.aggregator import context_aggregator
+            context = await context_aggregator.get_full_context(str(user_id), companion_id)
+
             # 生成系统提示词
             system_prompt = SystemPromptGenerator.generate_system_prompt(
                 companion_name=companion_info['name'],
-                personality_type=companion_info.get('personality', 'companion')
+                personality_type=companion_info.get('personality', 'companion'),
+                context=context
             )
             
             # 获取会话上下文（从数据库加载历史）
