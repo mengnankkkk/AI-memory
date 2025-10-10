@@ -4,9 +4,11 @@ Redis优化工具类
 """
 import json
 import logging
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 from app.core.redis_client import get_redis
 import time
+
+from app.config.affinity_levels import normalize_level_key
 
 logger = logging.getLogger("redis_utils")
 
@@ -212,33 +214,76 @@ class RedisAffinityManager:
         try:
             redis = await get_redis()
             state_key = f"{self.state_prefix}:{user_id}:{companion_id}"
-            
+
             # 检查是否已存在
             existing_state = await redis.get(state_key)
             if existing_state:
                 return json.loads(existing_state)
-            
-            # 初始化状态
+
+            # 初始化状态（使用英文键名，与affinity_levels.py保持一致）
             initial_state = {
                 "affinity_score": 50,  # 初始好感度
                 "trust_score": 10,     # 信任度
                 "tension_score": 0,    # 紧张度
-                "romance_level": "初识", # 关系阶段
+                "romance_level": "stranger",  # 关系阶段（英文键名）
                 "current_mood": "平静",  # 当前心情
                 "mood_last_updated": int(time.time()),
                 "last_interaction_at": int(time.time()),
                 "total_interactions": 0,
                 "days_since_first_meet": 0,
+                "positive_interactions": 0,
+                "negative_interactions": 0,
                 "special_events_triggered": [],
                 "gifts_received": [],
+                "special_moments": 0,
                 "outfit_unlocked": ["default"],
                 "memories": []
             }
-            
+
+            initial_state, _ = self._ensure_state_defaults(initial_state)
+
             await redis.setex(state_key, self.relationship_expire, json.dumps(initial_state))
             return initial_state
         except Exception as e:
             logger.error(f"[init_companion_state] {e}")
+            return None
+
+    async def initialize_companion_state(self, user_id: str, companion_id: int,
+                                        initial_affinity: int = 50,
+                                        initial_trust: int = 10,
+                                        initial_tension: int = 0,
+                                        romance_level: str = "stranger"):
+        """完整的伙伴状态初始化（带自定义参数）"""
+        try:
+            redis = await get_redis()
+            state_key = f"{self.state_prefix}:{user_id}:{companion_id}"
+
+            # 创建初始状态
+            initial_state = {
+                "affinity_score": initial_affinity,
+                "trust_score": initial_trust,
+                "tension_score": initial_tension,
+                "romance_level": normalize_level_key(romance_level),
+                "current_mood": "平静",
+                "mood_last_updated": int(time.time()),
+                "last_interaction_at": int(time.time()),
+                "total_interactions": 0,
+                "days_since_first_meet": 0,
+                "positive_interactions": 0,
+                "negative_interactions": 0,
+                "special_events_triggered": [],
+                "gifts_received": [],
+                "special_moments": 0,
+                "outfit_unlocked": ["default"],
+                "memories": []
+            }
+
+            initial_state, _ = self._ensure_state_defaults(initial_state)
+
+            await redis.setex(state_key, self.relationship_expire, json.dumps(initial_state))
+            return initial_state
+        except Exception as e:
+            logger.error(f"[initialize_companion_state] {e}")
             return None
 
     async def get_companion_state(self, user_id: str, companion_id: int) -> Optional[Dict]:
@@ -248,7 +293,11 @@ class RedisAffinityManager:
             state_key = f"{self.state_prefix}:{user_id}:{companion_id}"
             state_data = await redis.get(state_key)
             if state_data:
-                return json.loads(state_data)
+                state = json.loads(state_data)
+                state, modified = self._ensure_state_defaults(state)
+                if modified:
+                    await redis.setex(state_key, self.relationship_expire, json.dumps(state))
+                return state
             # 如果不存在，初始化
             return await self.init_companion_state(user_id, companion_id)
         except Exception as e:
@@ -263,6 +312,8 @@ class RedisAffinityManager:
             state = await self.get_companion_state(user_id, companion_id)
             if not state:
                 return False
+
+            state, _ = self._ensure_state_defaults(state)
             
             # 更新数值
             state["affinity_score"] = max(0, min(1000, state["affinity_score"] + affinity_change))
@@ -293,21 +344,22 @@ class RedisAffinityManager:
             return False
 
     def _calculate_romance_level(self, affinity_score: int) -> str:
-        """根据好感度计算关系阶段"""
-        if affinity_score < 100:
-            return "初识"
-        elif affinity_score < 200:
-            return "朋友"
-        elif affinity_score < 350:
-            return "好朋友"
-        elif affinity_score < 500:
-            return "特别的人"
-        elif affinity_score < 700:
-            return "心动"
-        elif affinity_score < 850:
-            return "恋人"
+        """根据好感度计算关系阶段 - 与 affinity_levels.py 保持完全一致"""
+        # 使用标准7级系统，返回英文键名
+        if affinity_score <= 100:
+            return "stranger"  # 陌生 (0-100)
+        elif affinity_score <= 250:
+            return "acquaintance"  # 认识 (101-250)
+        elif affinity_score <= 450:
+            return "friend"  # 朋友 (251-450)
+        elif affinity_score <= 600:
+            return "close_friend"  # 好友 (451-600)
+        elif affinity_score <= 750:
+            return "special"  # 特别的人 (601-750)
+        elif affinity_score <= 900:
+            return "romantic"  # 心动 (751-900)
         else:
-            return "深爱"
+            return "lover"  # 恋人 (901-1000)
 
     def _calculate_mood(self, state: Dict, interaction_type: str) -> str:
         """计算AI心情"""
@@ -382,8 +434,8 @@ class RedisAffinityManager:
             if keyword in memory_text:
                 base_importance += 0.2
         
-        # 关系阶段提升重要性
-        if state["romance_level"] in ["恋人", "深爱"]:
+        # 关系阶段提升重要性（使用英文键名）
+        if state["romance_level"] in ["romantic", "lover"]:
             base_importance += 0.3
         
         return min(1.0, base_importance)
@@ -401,7 +453,11 @@ class RedisAffinityManager:
                 "name": gift_name,
                 "given_at": int(time.time())
             }
-            state["gifts_received"].append(gift_record)
+            gifts = state.get("gifts_received")
+            if not isinstance(gifts, list):
+                gifts = []
+            gifts.append(gift_record)
+            state["gifts_received"] = gifts
             
             # 根据礼物类型增加好感度
             gift_affinity_map = {
@@ -416,11 +472,148 @@ class RedisAffinityManager:
             affinity_gain = gift_affinity_map.get(gift_type, 5)
             await self.update_affinity(user_id, companion_id, affinity_gain, 
                                      trust_change=2, interaction_type="gift")
+
+            # 合并最新状态并保存礼物记录
+            latest_state = await self.get_companion_state(user_id, companion_id) or {}
+            latest_state["gifts_received"] = state["gifts_received"]
+            latest_state["gifts_received_count"] = len(state["gifts_received"])
+
+            redis = await get_redis()
+            state_key = f"{self.state_prefix}:{user_id}:{companion_id}"
+            await redis.setex(state_key, self.relationship_expire, json.dumps(latest_state))
             
             return True
         except Exception as e:
             logger.error(f"[give_gift] {e}")
             return False
+
+    def _ensure_state_defaults(self, state: Dict[str, Any]) -> Tuple[Dict[str, Any], bool]:
+        """确保状态包含所有必需字段且类型正确。"""
+
+        modified = False
+        if not isinstance(state, dict):
+            return {
+                "affinity_score": 50,
+                "trust_score": 10,
+                "tension_score": 0,
+                "romance_level": "stranger",
+                "current_mood": "平静",
+                "mood_last_updated": int(time.time()),
+                "last_interaction_at": int(time.time()),
+                "total_interactions": 0,
+                "days_since_first_meet": 0,
+                "positive_interactions": 0,
+                "negative_interactions": 0,
+                "special_events_triggered": [],
+                "gifts_received": [],
+                "special_moments": 0,
+                "outfit_unlocked": ["default"],
+                "memories": []
+            }, True
+
+        def _clone(value: Any) -> Any:
+            if isinstance(value, list):
+                return list(value)
+            if isinstance(value, dict):
+                return dict(value)
+            return value
+
+        timestamp = int(time.time())
+        defaults = {
+            "affinity_score": 50,
+            "trust_score": 10,
+            "tension_score": 0,
+            "romance_level": "stranger",
+            "current_mood": "平静",
+            "mood_last_updated": timestamp,
+            "last_interaction_at": timestamp,
+            "total_interactions": 0,
+            "days_since_first_meet": 0,
+            "positive_interactions": 0,
+            "negative_interactions": 0,
+            "special_moments": 0,
+            "special_events_triggered": [],
+            "gifts_received": [],
+            "outfit_unlocked": ["default"],
+            "memories": []
+        }
+
+        for key, default_value in defaults.items():
+            if key not in state or state[key] is None:
+                state[key] = _clone(default_value)
+                modified = True
+
+        # 数值字段校准
+        numeric_fields = [
+            "affinity_score", "trust_score", "tension_score",
+            "total_interactions", "days_since_first_meet",
+            "positive_interactions", "negative_interactions",
+            "special_moments"
+        ]
+        for key in numeric_fields:
+            try:
+                state[key] = int(state.get(key, defaults[key]))
+            except (TypeError, ValueError):
+                state[key] = defaults[key]
+                modified = True
+
+        # 时间戳字段
+        for key in ["mood_last_updated", "last_interaction_at"]:
+            try:
+                state[key] = int(state.get(key, timestamp))
+            except (TypeError, ValueError):
+                state[key] = timestamp
+                modified = True
+
+        # 列表字段
+        list_fields = ["special_events_triggered", "outfit_unlocked", "memories"]
+        for key in list_fields:
+            if not isinstance(state.get(key), list):
+                state[key] = [] if key != "outfit_unlocked" else ["default"]
+                modified = True
+
+        # 礼物字段
+        gifts = state.get("gifts_received")
+        if isinstance(gifts, int):
+            state["gifts_received_count"] = gifts
+            state["gifts_received"] = []
+            modified = True
+        elif isinstance(gifts, list):
+            sanitized_gifts = []
+            for gift in gifts:
+                if isinstance(gift, dict):
+                    sanitized_gifts.append({
+                        "type": str(gift.get("type", "")),
+                        "name": str(gift.get("name", "")),
+                        "given_at": int(gift.get("given_at", timestamp))
+                    })
+                else:
+                    sanitized_gifts.append({
+                        "type": "",
+                        "name": str(gift),
+                        "given_at": timestamp
+                    })
+            if sanitized_gifts != gifts:
+                state["gifts_received"] = sanitized_gifts
+                modified = True
+            gift_count = len(state.get("gifts_received", []))
+            if state.get("gifts_received_count") != gift_count:
+                state["gifts_received_count"] = gift_count
+                modified = True
+        else:
+            state["gifts_received"] = []
+            modified = True
+            if state.get("gifts_received_count") not in (0, None):
+                state["gifts_received_count"] = 0
+                modified = True
+
+        # 关系等级归一化
+        normalized_level = normalize_level_key(state.get("romance_level", "stranger"))
+        if state.get("romance_level") != normalized_level:
+            state["romance_level"] = normalized_level
+            modified = True
+
+        return state, modified
 
 class RedisEventManager:
     """Redis事件管理器"""

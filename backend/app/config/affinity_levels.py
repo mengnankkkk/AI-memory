@@ -109,6 +109,55 @@ LEVEL_ORDER = [
 ]
 
 
+# 兼容别名映射（含中文显示名与同义词）
+_LEVEL_ALIAS_MAP: Dict[str, str] = {
+    **{key: key for key in AFFINITY_LEVELS.keys()},
+    **{level.name: key for key, level in AFFINITY_LEVELS.items()}
+}
+
+# 额外的中文别名
+_LEVEL_ALIAS_MAP.update({
+    "初识": "stranger",
+    "初识阶段": "stranger",
+    "认识": "acquaintance",
+    "普通朋友": "acquaintance",
+    "好朋友": "friend",
+    "好友": "close_friend",
+    "特别的人": "special",
+    "心动": "romantic",
+    "恋人": "lover",
+    "深爱": "lover"
+})
+
+
+def normalize_level_key(level: str) -> str:
+    """将任意形式的等级标识转换为标准英文键名。"""
+
+    if not level:
+        return "stranger"
+
+    candidate = level.strip()
+    if not candidate:
+        return "stranger"
+
+    # 先尝试直接匹配（区分大小写）
+    if candidate in _LEVEL_ALIAS_MAP:
+        return _LEVEL_ALIAS_MAP[candidate]
+
+    # 英文键名大小写不敏感处理
+    lowered = candidate.lower()
+    for key in AFFINITY_LEVELS.keys():
+        if lowered == key.lower():
+            return key
+
+    # 处理包含空格/连字符的形式
+    sanitized = lowered.replace(" ", "_").replace("-", "_")
+    if sanitized in AFFINITY_LEVELS:
+        return sanitized
+
+    return "stranger"
+
+
 def get_level_by_score(score: int) -> str:
     """根据分数获取等级名称"""
     # 确保分数在有效范围内
@@ -124,13 +173,14 @@ def get_level_by_score(score: int) -> str:
 
 def get_level_config(level_key: str) -> AffinityLevel:
     """获取等级配置"""
-    return AFFINITY_LEVELS.get(level_key, AFFINITY_LEVELS["stranger"])
+    normalized = normalize_level_key(level_key)
+    return AFFINITY_LEVELS.get(normalized, AFFINITY_LEVELS["stranger"])
 
 
 def get_next_level(current_level: str) -> str:
     """获取下一个等级"""
     try:
-        index = LEVEL_ORDER.index(current_level)
+        index = LEVEL_ORDER.index(normalize_level_key(current_level))
         if index < len(LEVEL_ORDER) - 1:
             return LEVEL_ORDER[index + 1]
         return current_level  # 已是最高等级
@@ -141,7 +191,7 @@ def get_next_level(current_level: str) -> str:
 def get_previous_level(current_level: str) -> str:
     """获取上一个等级"""
     try:
-        index = LEVEL_ORDER.index(current_level)
+        index = LEVEL_ORDER.index(normalize_level_key(current_level))
         if index > 0:
             return LEVEL_ORDER[index - 1]
         return current_level  # 已是最低等级

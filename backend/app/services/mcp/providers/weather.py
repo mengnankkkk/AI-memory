@@ -3,7 +3,7 @@ MCP - Weather Provider
 提供天气情境信息
 """
 from typing import Dict, Any
-from .base_provider import BaseContextProvider
+from ..base import BaseContextProvider
 
 class WeatherProvider(BaseContextProvider):
     """

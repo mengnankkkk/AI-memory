@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { ref, onMounted, nextTick, onBeforeUnmount } from 'vue'
+import { ref, onMounted, nextTick, onBeforeUnmount, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { companionService } from '@/services/companion'
 import { useUserStore } from '@/stores/user'
 import { useWebSocketChat } from '@/services/websocket'
 import RomancePanel from '@/components/RomancePanel.vue'
+import CompanionAvatar from '@/components/CompanionAvatar.vue'
 import type { Companion, ChatMessage } from '@/types'
 import api from '@/services/auth'
+import { romanceApi } from '@/services/romance'
+import { getLevelConfig, getLevelProgress, type AffinityLevelConfig } from '@/config/affinity-config'
 
 const route = useRoute()
 const router = useRouter()
@@ -39,6 +42,23 @@ const chatContainer = ref<HTMLElement | null>(null)
 const currentChatSession = ref<any>(null)
 const connectionStatus = ref('连接中...')
 const showRomancePanel = ref(false) // 控制恋爱攻略面板显示
+const affinityScore = ref<number | null>(null)
+const romanceLevel = ref<string>('')
+const showAffinityChange = ref(false)
+const affinityDelta = ref(0)
+let affinityTimeout: ReturnType<typeof setTimeout> | null = null
+
+// 计算等级配置
+const levelConfig = computed<AffinityLevelConfig | null>(() => {
+  if (!romanceLevel.value) return null
+  return getLevelConfig(romanceLevel.value)
+})
+
+// 计算当前等级进度
+const levelProgress = computed(() => {
+  if (!affinityScore.value || !romanceLevel.value) return 0
+  return getLevelProgress(affinityScore.value, romanceLevel.value)
+})
 
 // 加载伙伴信息和聊天历史
 const loadCompanion = async () => {
@@ -57,6 +77,8 @@ const loadCompanion = async () => {
       content: companion.value.greeting || '你好！我是你的AI伙伴，很高兴认识你！'
     })
     
+    await loadCompanionState()
+
     // 加载聊天会话历史
     await loadChatHistory()
     
@@ -64,6 +86,40 @@ const loadCompanion = async () => {
     console.error('加载失败:', error)
     alert('无法加载伙伴信息')
     router.push({ name: 'home' })
+  }
+}
+
+const loadCompanionState = async () => {
+  try {
+    if (!companion.value) return
+    const state = await romanceApi.getCompanionState(companionId, userStore.userId || 'default')
+    affinityScore.value = state.affinity_score
+    romanceLevel.value = state.romance_level
+  } catch (error) {
+    console.error('加载伙伴状态失败:', error)
+  }
+}
+
+const refreshAffinityState = async () => {
+  try {
+    if (!companion.value) return
+    const prev = affinityScore.value
+    await loadCompanionState()
+    if (prev !== null && affinityScore.value !== null) {
+      const delta = affinityScore.value - prev
+      if (delta !== 0) {
+        affinityDelta.value = delta
+        showAffinityChange.value = true
+        if (affinityTimeout) {
+          clearTimeout(affinityTimeout)
+        }
+        affinityTimeout = setTimeout(() => {
+          showAffinityChange.value = false
+        }, 1500)
+      }
+    }
+  } catch (error) {
+    console.error('刷新好感度失败:', error)
   }
 }
 
@@ -153,7 +209,7 @@ const initWebSocket = () => {
   })
   
   // 监听流式响应结束
-  onResponseEnd((fullContent) => {
+  onResponseEnd(async (fullContent) => {
     console.log('✅ 流式响应完成:', fullContent)
     // 确保最后一条消息内容正确
     const lastMessage = messages.value[messages.value.length - 1]
@@ -169,6 +225,7 @@ const initWebSocket = () => {
       })
     }
     isLoading.value = false
+    await refreshAffinityState()
   })
   
   // 监听错误
@@ -283,6 +340,9 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   removeAllListeners()
   disconnect()
+  if (affinityTimeout) {
+    clearTimeout(affinityTimeout)
+  }
 })
 </script>
 
@@ -300,22 +360,62 @@ onBeforeUnmount(() => {
             >
               ← 返回
             </button>
-            <div v-if="companion" class="flex items-center space-x-2">
-              <div class="text-3xl">{{ companion.avatar_id === 'avatar_01' ? '🌸' : '🌟' }}</div>
+            <div v-if="companion" class="flex items-center space-x-3">
+              <!-- 使用头像组件 -->
+              <CompanionAvatar
+                :companion-id="companion.personality_archetype || 'linzixi'"
+                :companion-name="companion.name"
+                :level-key="romanceLevel || 'stranger'"
+                :affinity-score="affinityScore || 50"
+                size="medium"
+                :show-level-badge="true"
+                :animated="true"
+              />
               <div>
                 <h2 class="font-bold text-gray-800">{{ companion.name }}</h2>
-                <p class="text-xs text-gray-500">
-                  {{
-                    companion.personality_archetype === 'listener' ? '温柔的倾听者' :
-                    companion.personality_archetype === 'cheerleader' ? '元气的鼓励者' :
-                    '理性的分析者'
-                  }}
-                </p>
+                <!-- 等级名称和描述 -->
+                <div class="flex items-center space-x-2 text-xs">
+                  <span
+                    class="font-semibold"
+                    :style="{ color: levelConfig?.color || '#6b7280' }"
+                  >
+                    {{ levelConfig?.name || '关系初始化中' }}
+                  </span>
+                  <span class="text-gray-400">·</span>
+                  <span class="text-gray-500">好感度 {{ affinityScore ?? '--' }}</span>
+                </div>
+                <!-- 等级进度条 -->
+                <div class="mt-1 w-48">
+                  <div class="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      class="h-full transition-all duration-500 ease-out rounded-full"
+                      :style="{
+                        width: levelProgress + '%',
+                        background: `linear-gradient(90deg, ${levelConfig?.color || '#6b7280'} 0%, ${levelConfig?.bgColor || '#e5e7eb'} 100%)`
+                      }"
+                    ></div>
+                  </div>
+                  <p class="text-xs text-gray-400 mt-0.5">{{ levelConfig?.description || '' }}</p>
+                </div>
               </div>
             </div>
           </div>
 
           <div class="flex items-center space-x-2">
+            <div class="relative flex items-center space-x-1 bg-pink-50 border border-pink-200 px-3 py-2 rounded-lg">
+              <span class="text-lg">❤️</span>
+              <span class="text-sm font-semibold text-pink-600">{{ affinityScore ?? '--' }}</span>
+              <transition name="affinity-pop">
+                <div
+                  v-if="showAffinityChange"
+                  class="absolute -top-6 left-1/2 -translate-x-1/2 flex items-center space-x-1 text-sm font-semibold"
+                  :class="affinityDelta > 0 ? 'text-pink-500' : 'text-blue-500'"
+                >
+                  <span>{{ affinityDelta > 0 ? '+' : '' }}{{ affinityDelta }}</span>
+                  <span>❤</span>
+                </div>
+              </transition>
+            </div>
             <!-- 恋爱攻略面板切换按钮 -->
             <button
               @click="showRomancePanel = !showRomancePanel"
@@ -465,5 +565,37 @@ onBeforeUnmount(() => {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+
+.affinity-pop-enter-active {
+  animation: heartFloat 1.2s ease-out forwards;
+}
+
+.affinity-pop-leave-active {
+  animation: heartFloat 0.6s ease-in reverse forwards;
+}
+
+.affinity-pop-enter-from,
+.affinity-pop-leave-to {
+  opacity: 0;
+}
+
+@keyframes heartFloat {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 0) scale(0.8);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(-50%, -10px) scale(1);
+  }
+  80% {
+    opacity: 1;
+    transform: translate(-50%, -30px) scale(1.05);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -40px) scale(0.9);
+  }
 }
 </style>

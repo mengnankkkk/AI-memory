@@ -6,7 +6,7 @@ import asyncio
 import pkgutil
 import importlib
 from typing import Dict, Any, List
-from .base_provider import BaseContextProvider
+from .base import BaseContextProvider
 
 class ContextAggregator:
     """

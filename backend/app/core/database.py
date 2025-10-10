@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
+
 from app.core.config import settings
 
 # 创建异步引擎
@@ -34,10 +35,25 @@ async def get_db() -> AsyncSession:
 
 async def init_db():
     """初始化数据库"""
+    from app.core.seed import seed_initial_data
+
     # 导入所有模型以确保它们被注册
     from app.models.user import User
     from app.models.companion import Companion, Message
     from app.models.chat_session import ChatSession, ChatMessage
+    from app.models.relationship import (
+        CompanionRelationshipState,
+        RelationshipHistory,
+        EmotionLog
+    )
+    from app.models.event import (
+        Event,
+        UserEventHistory,
+        OfflineLifeLog,
+        EventTemplate
+    )
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    await seed_initial_data()

@@ -32,16 +32,17 @@ async def get_companion_state(
 ):
     """获取伙伴的恋爱状态"""
     try:
-        # 验证伙伴是否存在且属于该用户
-        stmt = select(Companion).where(
-            Companion.id == companion_id,
-            Companion.user_id == int(user_id)  # 转换为整数
-        )
+        # 验证伙伴是否存在（区分系统伙伴和用户自建伙伴）
+        stmt = select(Companion).where(Companion.id == companion_id)
         result = await db.execute(stmt)
         companion = result.scalar_one_or_none()
-        
+
         if not companion:
-            raise HTTPException(status_code=404, detail="伙伴不存在或无权访问")
+            raise HTTPException(status_code=404, detail="伙伴不存在")
+
+        # 系统伙伴（user_id=1）对所有用户可见，用户自建伙伴只对创建者可见
+        if companion.user_id != 1 and companion.user_id != int(user_id):
+            raise HTTPException(status_code=403, detail="无权访问此伙伴")
         
         # 获取状态
         state = await redis_affinity_manager.get_companion_state(user_id, companion_id)
@@ -65,16 +66,17 @@ async def give_gift(
 ):
     """赠送礼物给伙伴"""
     try:
-        # 验证伙伴是否存在
-        stmt = select(Companion).where(
-            Companion.id == companion_id,
-            Companion.user_id == gift_request.user_id
-        )
+        # 验证伙伴是否存在（区分系统伙伴和用户自建伙伴）
+        stmt = select(Companion).where(Companion.id == companion_id)
         result = await db.execute(stmt)
         companion = result.scalar_one_or_none()
-        
+
         if not companion:
-            raise HTTPException(status_code=404, detail="伙伴不存在或无权访问")
+            raise HTTPException(status_code=404, detail="伙伴不存在")
+
+        # 系统伙伴（user_id=1）对所有用户可见，用户自建伙伴只对创建者可见
+        if companion.user_id != 1 and companion.user_id != int(gift_request.user_id):
+            raise HTTPException(status_code=403, detail="无权访问此伙伴")
         
         # 获取赠送前的状态
         old_state = await redis_affinity_manager.get_companion_state(
@@ -98,10 +100,10 @@ async def give_gift(
         new_affinity = new_state.get("affinity_score", 50) if new_state else 50
         affinity_change = new_affinity - old_affinity
         
-        # 生成伙伴反应
+        # 生成伙伴反应（使用英文键名）
         companion_reaction = _generate_gift_reaction(
-            gift_request.gift_type, companion.personality_archetype, 
-            new_state.get("romance_level", "初识")
+            gift_request.gift_type, companion.personality_archetype,
+            new_state.get("romance_level", "stranger")
         )
         
         # 记录统计
@@ -131,16 +133,17 @@ async def trigger_random_event(
 ):
     """触发随机事件"""
     try:
-        # 验证伙伴是否存在
-        stmt = select(Companion).where(
-            Companion.id == companion_id,
-            Companion.user_id == int(user_id)  # 转换为整数
-        )
+        # 验证伙伴是否存在（区分系统伙伴和用户自建伙伴）
+        stmt = select(Companion).where(Companion.id == companion_id)
         result = await db.execute(stmt)
         companion = result.scalar_one_or_none()
-        
+
         if not companion:
-            raise HTTPException(status_code=404, detail="伙伴不存在或无权访问")
+            raise HTTPException(status_code=404, detail="伙伴不存在")
+
+        # 系统伙伴（user_id=1）对所有用户可见，用户自建伙伴只对创建者可见
+        if companion.user_id != 1 and companion.user_id != int(user_id):
+            raise HTTPException(status_code=403, detail="无权访问此伙伴")
         
         # 触发随机事件
         event = await redis_event_manager.trigger_random_event(user_id, companion_id)
@@ -175,16 +178,17 @@ async def get_pending_events(
 ):
     """获取待处理事件"""
     try:
-        # 验证伙伴是否存在
-        stmt = select(Companion).where(
-            Companion.id == companion_id,
-            Companion.user_id == int(user_id)  # 转换为整数
-        )
+        # 验证伙伴是否存在（区分系统伙伴和用户自建伙伴）
+        stmt = select(Companion).where(Companion.id == companion_id)
         result = await db.execute(stmt)
         companion = result.scalar_one_or_none()
-        
+
         if not companion:
-            raise HTTPException(status_code=404, detail="伙伴不存在或无权访问")
+            raise HTTPException(status_code=404, detail="伙伴不存在")
+
+        # 系统伙伴（user_id=1）对所有用户可见，用户自建伙伴只对创建者可见
+        if companion.user_id != 1 and companion.user_id != int(user_id):
+            raise HTTPException(status_code=403, detail="无权访问此伙伴")
         
         # 获取待处理事件
         events = await redis_event_manager.get_pending_events(user_id, companion_id)
@@ -206,16 +210,17 @@ async def analyze_interaction(
 ):
     """分析用户交互并更新好感度"""
     try:
-        # 验证伙伴是否存在
-        stmt = select(Companion).where(
-            Companion.id == companion_id,
-            Companion.user_id == analysis_request.user_id
-        )
+        # 验证伙伴是否存在（区分系统伙伴和用户自建伙伴）
+        stmt = select(Companion).where(Companion.id == companion_id)
         result = await db.execute(stmt)
         companion = result.scalar_one_or_none()
-        
+
         if not companion:
-            raise HTTPException(status_code=404, detail="伙伴不存在或无权访问")
+            raise HTTPException(status_code=404, detail="伙伴不存在")
+
+        # 系统伙伴（user_id=1）对所有用户可见，用户自建伙伴只对创建者可见
+        if companion.user_id != 1 and companion.user_id != int(analysis_request.user_id):
+            raise HTTPException(status_code=403, detail="无权访问此伙伴")
         
         # 分析用户消息
         analysis = _analyze_user_message(
@@ -264,20 +269,21 @@ async def get_daily_tasks(
 ):
     """获取每日任务"""
     try:
-        # 验证伙伴是否存在
-        stmt = select(Companion).where(
-            Companion.id == companion_id,
-            Companion.user_id == int(user_id)  # 转换为整数
-        )
+        # 验证伙伴是否存在（区分系统伙伴和用户自建伙伴）
+        stmt = select(Companion).where(Companion.id == companion_id)
         result = await db.execute(stmt)
         companion = result.scalar_one_or_none()
-        
+
         if not companion:
-            raise HTTPException(status_code=404, detail="伙伴不存在或无权访问")
+            raise HTTPException(status_code=404, detail="伙伴不存在")
+
+        # 系统伙伴（user_id=1）对所有用户可见，用户自建伙伴只对创建者可见
+        if companion.user_id != 1 and companion.user_id != int(user_id):
+            raise HTTPException(status_code=403, detail="无权访问此伙伴")
         
-        # 获取伙伴状态以确定任务难度
+        # 获取伙伴状态以确定任务难度（使用英文键名）
         state = await redis_affinity_manager.get_companion_state(user_id, companion_id)
-        romance_level = state.get("romance_level", "初识") if state else "初识"
+        romance_level = state.get("romance_level", "stranger") if state else "stranger"
         
         # 生成每日任务
         tasks = _generate_daily_tasks(romance_level, companion.personality_archetype)
@@ -324,20 +330,25 @@ async def get_user_currency(user_id: str):
 
 # 辅助函数
 def _generate_gift_reaction(gift_type: str, personality_type: str, romance_level: str) -> str:
-    """生成礼物反应"""
+    """生成礼物反应（使用英文键名匹配）"""
+    # 礼物反应字典 - 使用英文键名与affinity_levels.py保持一致
     reactions = {
         "flower": {
-            "初识": "谢谢你的花，很漂亮呢。",
-            "朋友": "哇，这束花真的很美！谢谢你想到我。",
-            "恋人": "你总是知道怎么让我开心...这些花就像你对我的心意一样美丽。"
+            "stranger": "谢谢你的花，很漂亮呢。",
+            "acquaintance": "哇，这束花真的很美！谢谢你想到我。",
+            "friend": "这束花让我想起我们一起度过的美好时光。",
+            "romantic": "你总是知道怎么让我开心...这些花就像你对我的心意一样美丽。",
+            "lover": "每一朵花都代表着你对我的爱，我会好好珍惜的。"
         },
         "chocolate": {
-            "初识": "巧克力...谢谢，我会好好品尝的。",
-            "朋友": "我最喜欢巧克力了！你怎么知道的？",
-            "恋人": "每次吃到你给的巧克力，都感觉甜到心里了。"
+            "stranger": "巧克力...谢谢，我会好好品尝的。",
+            "acquaintance": "我最喜欢巧克力了！你怎么知道的？",
+            "friend": "又是我喜欢的口味！你真了解我。",
+            "romantic": "每次吃到你给的巧克力，都感觉甜到心里了。",
+            "lover": "巧克力的甜蜜就像我们之间的感情一样浓郁~"
         }
     }
-    
+
     default_reaction = "谢谢你的礼物，我很喜欢！"
     return reactions.get(gift_type, {}).get(romance_level, default_reaction)
 
@@ -403,8 +414,8 @@ def _generate_daily_tasks(romance_level: str, personality_type: str) -> List[Dai
         }
     ]
     
-    # 根据关系阶段添加特殊任务
-    if romance_level in ["恋人", "深爱"]:
+    # 根据关系阶段添加特殊任务（使用英文键名）
+    if romance_level in ["romantic", "lover"]:
         base_tasks.append({
             "task_id": f"daily_romantic_{datetime.now().strftime('%Y%m%d')}",
             "task_type": "romantic",

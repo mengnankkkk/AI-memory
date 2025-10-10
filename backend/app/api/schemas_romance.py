@@ -6,6 +6,13 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 
+class GiftRecord(BaseModel):
+    """礼物记录"""
+    type: str
+    name: str
+    given_at: int
+
+
 class CompanionStateResponse(BaseModel):
     """伙伴状态响应"""
     affinity_score: int
@@ -17,8 +24,12 @@ class CompanionStateResponse(BaseModel):
     last_interaction_at: int
     total_interactions: int
     days_since_first_meet: int
+    positive_interactions: int
+    negative_interactions: int
     special_events_triggered: List[str]
-    gifts_received: List[Dict[str, Any]]
+    gifts_received: List[GiftRecord]
+    gifts_received_count: Optional[int] = None
+    special_moments: int  # 特殊时刻数量
     outfit_unlocked: List[str]
     memories: List[Dict[str, Any]]
 

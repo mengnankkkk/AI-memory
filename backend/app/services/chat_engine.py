@@ -3,16 +3,19 @@
 使用 WebSocket 实现流式对话功能，支持会话持久化和用户隔离
 """
 import asyncio
-import json
 import logging
 from typing import Dict, List, Optional, AsyncIterator
 import socketio
-from app.services.streaming_llm import streaming_llm_service
-from app.services.memory_manager import memory_manager, SystemPromptGenerator, content_filter
-from app.services.redis_utils import redis_session_manager, redis_stats_manager
+from app.services.memory_manager import memory_manager, content_filter
+from app.services.redis_utils import (
+    redis_session_manager,
+    redis_stats_manager,
+    redis_affinity_manager,
+)
 from app.services.analytics import analytics_service
 from app.services.hot_cache import hot_conversation_cache
 from app.services.personal_timeline_simulator import timeline_simulator
+from app.services.response_coordinator import response_coordinator
 from app.core.config import settings
 from app.models.companion import Companion
 from app.models.chat_session import ChatSession, ChatMessage
@@ -198,7 +201,8 @@ class ChatEngine:
                     'id': companion.id,
                     'name': companion.name,
                     'personality': getattr(companion, 'personality_archetype', 'companion'),
-                    'description': getattr(companion, 'custom_greeting', '')
+                    'description': getattr(companion, 'custom_greeting', ''),
+                    'prompt_version': getattr(companion, 'prompt_version', 'v1')
                 }
         except Exception as e:
             logger.error(f"获取伙伴信息失败: {e}")
@@ -250,7 +254,11 @@ class ChatEngine:
                 return
             
             # 检查是否有重要的离线生活日志需要提及
-            important_logs = await self._check_and_mention_offline_life(session_id, session['companion_id'], session['user_id'])
+            important_logs = await self._check_and_mention_offline_life(
+                session_id,
+                session['companion_id'],
+                session['user_id']
+            )
             if important_logs:
                 # 先提及离线生活日志
                 offline_mention = self._format_offline_life_mention(important_logs)
@@ -259,54 +267,61 @@ class ChatEngine:
                 await self.save_message_to_db(session_id, "assistant", offline_mention)
                 await memory_manager.add_message(session_id, "assistant", offline_mention)
 
+            # 获取会话上下文（优先从数据库加载历史）
+            conversation_history = await self.load_chat_history(session_id, limit=8)
+            if not conversation_history:
+                conversation_history = await memory_manager.get_session_context(session_id)
+
+            # 获取当前伙伴状态
+            companion_state = await redis_affinity_manager.get_companion_state(
+                str(session['user_id']),
+                session['companion_id']
+            ) or {}
+
+            # 协调生成回复
+            coordinated_response = await response_coordinator.coordinate_response(
+                user_message=user_message,
+                user_id=str(session['user_id']),
+                companion_id=session['companion_id'],
+                companion_name=companion_info['name'],
+                current_affinity_score=companion_state.get('affinity_score', 50),
+                current_trust_score=companion_state.get('trust_score', 50),
+                current_tension_score=companion_state.get('tension_score', 0),
+                current_level=companion_state.get('romance_level', 'stranger'),
+                current_mood=companion_state.get('current_mood', 'neutral'),
+                conversation_history=conversation_history,
+                enable_memory=True,
+                special_instructions=None,
+                debug_mode=False
+            )
+
+            assistant_response = coordinated_response.ai_response or ""
+
             # 记录 Prompt 版本使用埋点
-            prompt_version = companion_info.get('prompt_version', 'v1')
             await analytics_service.track_prompt_usage(
-                session['user_id'], 
-                prompt_version, 
+                str(session['user_id']),
                 session['companion_id'],
+                companion_info.get('prompt_version', 'v1'),
                 companion_info.get('personality', 'companion')
             )
-            
-            # 获取实时情境
-            from app.services.mcp.aggregator import context_aggregator
-            context = await context_aggregator.get_full_context(str(user_id), companion_id)
 
-            # 生成系统提示词
-            system_prompt = SystemPromptGenerator.generate_system_prompt(
-                companion_name=companion_info['name'],
-                personality_type=companion_info.get('personality', 'companion'),
-                context=context
-            )
-            
-            # 获取会话上下文（优先从数据库加载历史）
-            db_history = await self.load_chat_history(session_id, limit=8)
-            if db_history:
-                # 使用数据库历史
-                context_messages = db_history
-            else:
-                # 回退到内存会话
-                context_messages = await memory_manager.get_session_context(session_id)
-            
-            # 调用 LLM 进行流式回复
-            assistant_response = ""
-            async for chunk in self.stream_llm_response(system_prompt, context_messages):
-                assistant_response += chunk
+            # 将回复拆分并发送
+            for chunk in self._chunk_response(assistant_response):
                 yield chunk
-            
+
             # 保存助手回复到数据库和内存
             if assistant_response:
                 await self.save_message_to_db(session_id, "assistant", assistant_response)
                 await memory_manager.add_message(session_id, "assistant", assistant_response)
-                
+
                 # 检查是否为高质量回复，缓存到热门对话
-                if len(assistant_response) > 50 and len(assistant_response) < 1000:
+                if 50 < len(assistant_response) < 1000:
                     await hot_conversation_cache.cache_response(
                         'companion',
                         user_message,
                         assistant_response
                     )
-                
+
                 # 增加成功回复统计
                 await redis_stats_manager.increment_counter("successful_responses")
                 
@@ -350,40 +365,57 @@ class ChatEngine:
                 yield "抱歉，找不到对应的AI伙伴信息。"
                 return
 
-            # 记录 Prompt 版本使用埋点
-            prompt_version = companion_info.get('prompt_version', 'v1')
-            # 获取实时情境
-            from app.services.mcp.aggregator import context_aggregator
-            context = await context_aggregator.get_full_context(str(user_id), companion_id)
-
-            # 生成系统提示词
-            system_prompt = SystemPromptGenerator.generate_system_prompt(
-                companion_name=companion_info['name'],
-                personality_type=companion_info.get('personality', 'companion'),
-                context=context
-            )
-            
             # 获取会话上下文（从数据库加载历史）
-            context_messages = await self.load_chat_history_by_session_id(db_session_id, limit=8)
-            
-            # 调用 LLM 进行流式回复
-            assistant_response = ""
-            async for chunk in self.stream_llm_response(system_prompt, context_messages):
-                assistant_response += chunk
+            conversation_history = await self.load_chat_history_by_session_id(db_session_id, limit=8)
+
+            # 获取当前伙伴状态
+            companion_state = await redis_affinity_manager.get_companion_state(
+                str(user_id),
+                companion_id
+            ) or {}
+
+            # 协调生成回复
+            coordinated_response = await response_coordinator.coordinate_response(
+                user_message=user_message,
+                user_id=str(user_id),
+                companion_id=companion_id,
+                companion_name=companion_info['name'],
+                current_affinity_score=companion_state.get('affinity_score', 50),
+                current_trust_score=companion_state.get('trust_score', 50),
+                current_tension_score=companion_state.get('tension_score', 0),
+                current_level=companion_state.get('romance_level', 'stranger'),
+                current_mood=companion_state.get('current_mood', 'neutral'),
+                conversation_history=conversation_history,
+                enable_memory=True,
+                special_instructions=None,
+                debug_mode=False
+            )
+
+            assistant_response = coordinated_response.ai_response or ""
+
+            # 记录 Prompt 版本使用埋点
+            await analytics_service.track_prompt_usage(
+                str(user_id),
+                companion_id,
+                companion_info.get('prompt_version', 'v1'),
+                companion_info.get('personality', 'companion')
+            )
+
+            for chunk in self._chunk_response(assistant_response):
                 yield chunk
-            
+
             # 保存助手回复到数据库
             if assistant_response:
                 await self.save_message_to_db_by_session_id(db_session_id, "assistant", assistant_response)
-                
+
                 # 检查是否为高质量回复，缓存到热门对话
-                if len(assistant_response) > 50 and len(assistant_response) < 1000:
+                if 50 < len(assistant_response) < 1000:
                     await hot_conversation_cache.cache_response(
                         'companion',
                         user_message,
                         assistant_response
                     )
-                
+
                 # 增加成功回复统计
                 await redis_stats_manager.increment_counter("successful_responses")
                 
@@ -393,36 +425,11 @@ class ChatEngine:
             await redis_stats_manager.increment_counter("error_responses")
             yield "抱歉，我现在遇到了一些技术问题，请稍后再试。😅"
     
-    async def stream_llm_response(self, system_prompt: str, messages: List[Dict]) -> AsyncIterator[str]:
-        """流式调用 LLM"""
-        try:
-            # 构建 LLM 消息格式，包含系统提示词
-            llm_messages = [{"role": "system", "content": system_prompt}]
-            
-            for msg in messages:
-                if msg['role'] in ['user', 'assistant']:
-                    llm_messages.append({
-                        'role': msg['role'],
-                        'content': msg['content']
-                    })
-            
-            # 使用流式 LLM 服务
-            assistant_response = ""
-            async for content in streaming_llm_service.stream_chat_completion(llm_messages):
-                # 内容过滤
-                is_safe, filter_reason = await content_filter.is_content_safe(content)
-                if not is_safe and filter_reason:
-                    logger.warning(f"Content filtered in streaming response: {filter_reason}")
-                    filtered_content = content_filter.get_filtered_response(filter_reason)
-                else:
-                    filtered_content = content
-                
-                assistant_response += filtered_content
-                yield filtered_content
-                    
-        except Exception as e:
-            logger.error(f"LLM 流式调用失败: {e}")
-            yield "抱歉，我现在有点累了，请稍后再和我聊天吧。😴"
+    def _chunk_response(self, text: str, chunk_size: int = 80) -> List[str]:
+        """将完整回复拆分为若干小段用于模拟流式输出"""
+        if not text:
+            return []
+        return [text[i:i + chunk_size] for i in range(0, len(text), chunk_size)]
     
     async def _check_and_mention_offline_life(self, session_id: str, companion_id: int, user_id: str) -> List[Dict]:
         """检查是否有重要的离线生活日志需要提及"""

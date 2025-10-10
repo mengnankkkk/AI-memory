@@ -5,7 +5,7 @@
       <div class="status-header">
         <h3>{{ companionName }} 的心意</h3>
         <div class="romance-level" :class="romanceLevelClass">
-          {{ companionState?.romance_level }}
+          {{ companionState ? getLevelConfig(companionState.romance_level).name : '初始化中' }}
         </div>
       </div>
       
@@ -131,12 +131,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { romanceApi } from '@/services/romance'
-import type { 
-  CompanionStateResponse, 
-  DailyTaskResponse, 
+import type {
+  CompanionStateResponse,
+  DailyTaskResponse,
   StoreItemResponse,
-  EventResponse 
+  EventResponse
 } from '@/types/romance'
+import { getLevelConfig, MOOD_EMOJIS } from '@/config/affinity-config'
 
 interface Props {
   companionId: number
@@ -162,17 +163,11 @@ const affinityPercentage = computed(() => {
 
 const romanceLevelClass = computed(() => {
   if (!companionState.value) return ''
-  const level = companionState.value.romance_level
-  const classMap: Record<string, string> = {
-    '初识': 'level-stranger',
-    '朋友': 'level-friend',
-    '好朋友': 'level-close-friend',
-    '特别的人': 'level-special',
-    '心动': 'level-crush',
-    '恋人': 'level-lover',
-    '深爱': 'level-deep-love'
-  }
-  return classMap[level] || ''
+  const levelKey = companionState.value.romance_level
+  const levelConfig = getLevelConfig(levelKey)
+
+  // 使用配置中的颜色类名
+  return `level-${levelKey}`
 })
 
 const affinityLevelClass = computed(() => {
@@ -191,17 +186,7 @@ const moodClass = computed(() => {
 
 const moodEmoji = computed(() => {
   if (!companionState.value) return '😐'
-  const moodMap: Record<string, string> = {
-    '平静': '😐',
-    '开心': '😊',
-    '愉快': '🙂',
-    '幸福': '😍',
-    '生气': '😠',
-    '委屈': '😢',
-    '困惑': '😕',
-    '不安': '😰'
-  }
-  return moodMap[companionState.value.current_mood] || '😐'
+  return MOOD_EMOJIS[companionState.value.current_mood] || '😐'
 })
 
 const recentMemories = computed(() => {
@@ -384,12 +369,12 @@ setInterval(() => {
 }
 
 .level-stranger { background: #e5e7eb; color: #6b7280; }
-.level-friend { background: #bfdbfe; color: #2563eb; }
-.level-close-friend { background: #a7f3d0; color: #059669; }
-.level-special { background: #fde68a; color: #d97706; }
-.level-crush { background: #fbb6ce; color: #e11d48; }
-.level-lover { background: #f9a8d4; color: #be185d; }
-.level-deep-love { background: #ddd6fe; color: #7c3aed; }
+.level-acquaintance { background: #bfdbfe; color: #2563eb; }
+.level-friend { background: #a7f3d0; color: #059669; }
+.level-close_friend { background: #fde68a; color: #d97706; }
+.level-special { background: #fbb6ce; color: #e11d48; }
+.level-romantic { background: #f9a8d4; color: #be185d; }
+.level-lover { background: #ddd6fe; color: #7c3aed; }
 
 .affinity-bar {
   margin-bottom: 16px;

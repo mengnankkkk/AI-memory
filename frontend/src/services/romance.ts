@@ -23,56 +23,56 @@ class RomanceApi {
    * 获取伙伴状态
    */
   async getCompanionState(companionId: number, userId: string): Promise<CompanionStateResponse> {
-    const response = await api.get(`${API_BASE}/companion/${companionId}/state?user_id=${userId}`)
-    return response
+    const { data } = await api.get(`${API_BASE}/companion/${companionId}/state?user_id=${userId}`)
+    return data
   }
 
   /**
    * 赠送礼物
    */
   async giveGift(companionId: number, giftRequest: GiftRequest): Promise<GiftResponse> {
-    const response = await api.post(`${API_BASE}/companion/${companionId}/gift`, giftRequest)
-    return response
+    const { data } = await api.post(`${API_BASE}/companion/${companionId}/gift`, giftRequest)
+    return data
   }
 
   /**
    * 触发随机事件
    */
   async triggerRandomEvent(companionId: number, userId: string): Promise<RandomEventResponse> {
-    const response = await api.post(`${API_BASE}/companion/${companionId}/random-event?user_id=${userId}`)
-    return response
+    const { data } = await api.post(`${API_BASE}/companion/${companionId}/random-event?user_id=${userId}`)
+    return data
   }
 
   /**
    * 获取待处理事件
    */
   async getPendingEvents(companionId: number, userId: string): Promise<{ events: any[] }> {
-    const response = await api.get(`${API_BASE}/companion/${companionId}/pending-events?user_id=${userId}`)
-    return response
+    const { data } = await api.get(`${API_BASE}/companion/${companionId}/pending-events?user_id=${userId}`)
+    return data
   }
 
   /**
    * 分析交互
    */
   async analyzeInteraction(request: InteractionAnalysisRequest): Promise<InteractionAnalysisResponse> {
-    const response = await api.post(`${API_BASE}/companion/${request.companion_id}/analyze-interaction`, request)
-    return response
+    const { data } = await api.post(`${API_BASE}/companion/${request.companion_id}/analyze-interaction`, request)
+    return data
   }
 
   /**
    * 获取每日任务
    */
   async getDailyTasks(companionId: number, userId: string): Promise<DailyTaskResponse[]> {
-    const response = await api.get(`${API_BASE}/companion/${companionId}/daily-tasks?user_id=${userId}`)
-    return response
+    const { data } = await api.get(`${API_BASE}/companion/${companionId}/daily-tasks?user_id=${userId}`)
+    return data
   }
 
   /**
    * 完成每日任务
    */
   async completeTask(taskId: string, companionId: number, userId: string): Promise<{ success: boolean; reward: number }> {
-    const response = await api.post(`${API_BASE}/companion/${companionId}/tasks/${taskId}/complete`, { user_id: userId })
-    return response
+    const { data } = await api.post(`${API_BASE}/companion/${companionId}/tasks/${taskId}/complete`, { user_id: userId })
+    return data
   }
 
   /**
@@ -84,10 +84,10 @@ class RomanceApi {
     if (rarity) params.append('rarity', rarity)
     
     const url = `${API_BASE}/store/items${params.toString() ? '?' + params.toString() : ''}`
-    const response = await api.get(url)
+    const { data } = await api.get(url)
     
     // 为礼物添加表情符号
-    return response.map((item: StoreItemResponse) => ({
+    return data.map((item: StoreItemResponse) => ({
       ...item,
       emoji: this.getGiftEmoji(item.item_type)
     }))
@@ -97,24 +97,24 @@ class RomanceApi {
    * 购买物品
    */
   async purchaseItem(itemId: string, userId: string): Promise<{ success: boolean; message: string }> {
-    const response = await api.post(`${API_BASE}/store/purchase`, { item_id: itemId, user_id: userId })
-    return response
+    const { data } = await api.post(`${API_BASE}/store/purchase`, { item_id: itemId, user_id: userId })
+    return data
   }
 
   /**
    * 获取用户货币
    */
   async getUserCurrency(userId: string): Promise<UserCurrencyResponse> {
-    const response = await api.get(`${API_BASE}/user/${userId}/currency`)
-    return response
+    const { data } = await api.get(`${API_BASE}/user/${userId}/currency`)
+    return data
   }
 
   /**
    * 获取聊天上下文（包含恋爱状态）
    */
   async getChatContext(request: CompanionChatContextRequest): Promise<CompanionChatContextResponse> {
-    const response = await api.post(`${API_BASE}/companion/${request.companion_id}/chat-context`, request)
-    return response
+    const { data } = await api.post(`${API_BASE}/companion/${request.companion_id}/chat-context`, request)
+    return data
   }
 
   /**
@@ -127,8 +127,8 @@ class RomanceApi {
     total_interactions: number
     average_affinity: number
   }> {
-    const response = await api.get(`${API_BASE}/user/${userId}/relationship-stats`)
-    return response
+    const { data } = await api.get(`${API_BASE}/user/${userId}/relationship-stats`)
+    return data
   }
 
   /**
@@ -143,8 +143,8 @@ class RomanceApi {
     max_progress: number
     reward: string
   }[]> {
-    const response = await api.get(`${API_BASE}/user/${userId}/achievements`)
-    return response
+    const { data } = await api.get(`${API_BASE}/user/${userId}/achievements`)
+    return data
   }
 
   /**
@@ -154,15 +154,15 @@ class RomanceApi {
     const response = await api.get(`${API_BASE}/companion/${companionId}/export?user_id=${userId}`, {
       responseType: 'blob'
     })
-    return response
+    return response.data
   }
 
   /**
    * 重置关系状态（开发用）
    */
   async resetRelationship(companionId: number, userId: string): Promise<{ success: boolean }> {
-    const response = await api.post(`${API_BASE}/companion/${companionId}/reset`, { user_id: userId })
-    return response
+    const { data } = await api.post(`${API_BASE}/companion/${companionId}/reset`, { user_id: userId })
+    return data
   }
 
   /**
@@ -190,9 +190,9 @@ class RomanceApi {
    * 获取推荐礼物
    */
   async getRecommendedGifts(companionId: number, userId: string): Promise<StoreItemResponse[]> {
-    const response = await api.get(`${API_BASE}/companion/${companionId}/recommended-gifts?user_id=${userId}`)
+    const { data } = await api.get(`${API_BASE}/companion/${companionId}/recommended-gifts?user_id=${userId}`)
     
-    return response.map((item: StoreItemResponse) => ({
+    return data.map((item: StoreItemResponse) => ({
       ...item,
       emoji: this.getGiftEmoji(item.item_type)
     }))
@@ -207,8 +207,8 @@ class RomanceApi {
     interactions: number
     events: string[]
   }[]> {
-    const response = await api.get(`${API_BASE}/companion/${companionId}/history?user_id=${userId}&days=${days}`)
-    return response
+    const { data } = await api.get(`${API_BASE}/companion/${companionId}/history?user_id=${userId}&days=${days}`)
+    return data
   }
 }
 

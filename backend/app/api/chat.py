@@ -5,14 +5,14 @@ from app.core.database import get_db
 from app.models.companion import Companion, Message
 from app.api.schemas import ChatRequest, ChatResponse
 from app.services.llm.factory import llm_service  # 使用统一的LLM服务工厂
-from app.core.prompts import get_prompt_by_version
+from app.core.prompts import get_prompt_by_version, get_system_prompt
 from app.core.config import settings
 from typing import List, Dict
 from app.services.llm.dedup_cache import get_llm_cache_key, get_cached_llm_response, set_cached_llm_response
 from app.services.analytics import analytics_service
 from app.services.hot_cache import hot_conversation_cache
 from app.services.redis_utils import redis_affinity_manager, redis_event_manager
-from app.services.affinity_engine import affinity_engine
+from app.services.affinity_engine import affinity_engine, analyze_and_update_affinity
 from app.services.response_coordinator import response_coordinator  # 新增：响应协调器
 import json
 import logging
@@ -67,13 +67,33 @@ async def chat_v2(
         f"伙伴:{request.companion_id}, 等级:{current_level}"
     )
 
-    # ========== 第二步：获取对话历史（用于L1工作记忆） ==========
+    # ========== 第二步：🔥 额外的好感度分析和记录 ==========
+    # 使用便捷接口进行额外的分析记录（与ResponseCoordinator并行）
+    try:
+        affinity_result = await analyze_and_update_affinity(
+            user_id=companion.user_id,
+            companion_id=request.companion_id,
+            message=request.message,
+            personality_type=companion.personality_archetype,
+            interaction_type="chat_v2"
+        )
+        
+        if affinity_result["success"]:
+            logger.info(
+                f"[ChatV2] 并行好感度分析 - 情感:{affinity_result['emotion']}, "
+                f"变化:{affinity_result['affinity_change']:+d}, "
+                f"新分数:{affinity_result['new_affinity_score']}"
+            )
+    except Exception as e:
+        logger.warning(f"[ChatV2] 并行好感度分析失败，但不影响主流程: {e}")
+
+    # ========== 第三步：获取对话历史（用于L1工作记忆） ==========
     session_key = f"{request.companion_id}:{request.session_id}"
     if session_key not in session_memory:
         session_memory[session_key] = []
     conversation_history = session_memory[session_key].copy()
 
-    # ========== 第三步：使用ResponseCoordinator执行完整的双阶段协议 ==========
+    # ========== 第四步：使用ResponseCoordinator执行完整的双阶段协议 ==========
     try:
         coordinated_response = await response_coordinator.coordinate_response(
             # 用户输入
@@ -108,7 +128,7 @@ async def chat_v2(
         logger.error(f"[ChatV2] 响应协调失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"生成回复失败: {str(e)}")
 
-    # ========== 第四步：更新所有状态到Redis ==========
+    # ========== 第五步：更新所有状态到Redis ==========
     await redis_affinity_manager.update_affinity(
         companion.user_id,
         request.companion_id,
@@ -135,7 +155,7 @@ async def chat_v2(
             f"({current_affinity_score} → {process_result.new_affinity_score})"
         )
 
-    # ========== 第五步：更新会话记忆 ==========
+    # ========== 第六步：更新会话记忆 ==========
     session_memory[session_key].append({"role": "user", "content": request.message})
     session_memory[session_key].append({"role": "assistant", "content": response})
 
@@ -143,13 +163,13 @@ async def chat_v2(
     if len(session_memory[session_key]) > settings.MAX_CONTEXT_MESSAGES:
         session_memory[session_key] = session_memory[session_key][-settings.MAX_CONTEXT_MESSAGES:]
 
-    # ========== 第六步：埋点和分析 ==========
+    # ========== 第七步：埋点和分析 ==========
     prompt_version = "v2_flow_protocol"  # 新版本标识
     await analytics_service.track_prompt_usage(
         companion.user_id, request.companion_id, prompt_version, companion.personality_archetype
     )
 
-    # ========== 第七步：特殊事件触发 ==========
+    # ========== 第八步：特殊事件触发 ==========
     updated_state = await redis_affinity_manager.get_companion_state(
         companion.user_id, request.companion_id
     )
@@ -162,7 +182,7 @@ async def chat_v2(
             if event:
                 logger.info(f"[ChatV2] 触发随机事件: {event['title']}")
 
-    # ========== 第八步：保存消息到数据库 ==========
+    # ========== 第九步：保存消息到数据库 ==========
     user_msg = Message(
         companion_id=request.companion_id,
         role="user",
@@ -217,53 +237,39 @@ async def chat(
     current_mood = companion_state.get("current_mood", "平静") if companion_state else "平静"
     current_level = companion_state.get("romance_level", "stranger") if companion_state else "stranger"
 
-    # TODO: 集成记忆系统（如果存在）
-    recent_memories = None  # 从L2情景记忆获取
-    user_facts = None  # 从L3语义记忆获取
-
-    # ========== 第二步：调用AffinityEngine处理消息 (Pass 1) ==========
+    # ========== 第二步：🔥 自动分析消息并更新好感度数据库 ==========
     logger.info(f"[Chat] 开始处理消息 - 用户:{companion.user_id}, 伙伴:{request.companion_id}")
 
-    process_result = await affinity_engine.process_user_message(
-        user_message=request.message,
-        current_affinity_score=current_affinity_score,
-        current_trust_score=current_trust_score,
-        current_tension_score=current_tension_score,
-        current_level=current_level,
-        current_mood=current_mood,
-        companion_name=companion.name,
+    # 使用便捷接口自动分析并更新好感度
+    affinity_result = await analyze_and_update_affinity(
         user_id=companion.user_id,
         companion_id=request.companion_id,
-        recent_memories=recent_memories,
-        user_facts=user_facts
+        message=request.message,
+        personality_type=companion.personality_archetype,
+        interaction_type="chat"
     )
 
-    # ========== 第三步：更新所有状态到Redis ==========
-    await redis_affinity_manager.update_affinity(
-        companion.user_id,
-        request.companion_id,
-        process_result.affinity_change,
-        process_result.trust_change,
-        process_result.tension_change,
-        "chat"
-    )
-
-    # 添加到记忆（如果值得记忆）
-    if process_result.emotion_analysis.is_memorable:
-        await redis_affinity_manager.add_memory(
-            companion.user_id,
-            request.companion_id,
-            request.message,
-            "conversation"
-        )
-
-    # 记录等级变化
-    if process_result.level_changed:
-        level_change_msg = "升级 ⬆️" if process_result.level_up else "降级 ⬇️"
+    # 记录分析结果
+    if affinity_result["success"]:
         logger.info(
-            f"[Chat] 好感度等级{level_change_msg}: {current_level} → {process_result.new_level} "
-            f"({current_affinity_score} → {process_result.new_affinity_score})"
+            f"[Chat] 好感度分析完成 - 情感:{affinity_result['emotion']}, "
+            f"变化:{affinity_result['affinity_change']:+d}, "
+            f"新分数:{affinity_result['new_affinity_score']}"
         )
+        
+        # 记录等级变化
+        if affinity_result["level_changed"]:
+            logger.info(
+                f"[Chat] 🎉 好感度等级变化: → {affinity_result['new_level']} "
+                f"(分数: {affinity_result['new_affinity_score']})"
+            )
+        
+        # 使用增强的系统提示词
+        enhanced_system_prompt = affinity_result["enhanced_prompt"]
+    else:
+        logger.error(f"[Chat] 好感度分析失败: {affinity_result.get('error', '未知错误')}")
+        # 使用默认提示词
+        enhanced_system_prompt = get_system_prompt(companion.name, companion.personality_archetype)
 
     # 埋点
     prompt_version = getattr(companion, 'prompt_version', 'v1')
@@ -271,7 +277,7 @@ async def chat(
         companion.user_id, request.companion_id, prompt_version, companion.personality_archetype
     )
 
-    # ========== 第四步：检查缓存 ==========
+    # ========== 第三步：检查缓存 ==========
     hot_response = await hot_conversation_cache.get_cached_response(
         companion.personality_archetype, request.message
     )
@@ -279,7 +285,7 @@ async def chat(
         logger.info(f"[Chat] 使用热门对话缓存")
         response = hot_response
     else:
-        # ========== 第五步：调用LLM生成最终回复 (Pass 2) ==========
+        # ========== 第四步：调用LLM生成最终回复 (Pass 2) ==========
         session_key = f"{request.companion_id}:{request.session_id}"
         if session_key not in session_memory:
             session_memory[session_key] = []
@@ -288,7 +294,7 @@ async def chat(
         # LLM请求去重
         cache_key = await get_llm_cache_key(
             companion.user_id, request.companion_id,
-            process_result.enhanced_system_prompt,
+            enhanced_system_prompt,
             context + [{"role": "user", "content": request.message}]
         )
         cached_resp = await get_cached_llm_response(cache_key)
@@ -298,7 +304,7 @@ async def chat(
         else:
             context.append({"role": "user", "content": request.message})
             messages = [
-                {"role": "system", "content": process_result.enhanced_system_prompt}
+                {"role": "system", "content": enhanced_system_prompt}
             ] + context[-settings.MAX_CONTEXT_MESSAGES:]
 
             logger.info(f"[Chat] 调用LLM生成回复 (Pass 2)")
@@ -312,7 +318,7 @@ async def chat(
             companion.personality_archetype, request.message, response
         )
 
-    # ========== 第六步：特殊事件触发 ==========
+    # ========== 第五步：特殊事件触发 ==========
     updated_state = await redis_affinity_manager.get_companion_state(
         companion.user_id, request.companion_id
     )
@@ -325,7 +331,7 @@ async def chat(
             if event:
                 logger.info(f"[Chat] 触发随机事件: {event['title']}")
 
-    # ========== 第七步：保存消息到数据库 ==========
+    # ========== 第六步：保存消息到数据库 ==========
     user_msg = Message(
         companion_id=request.companion_id,
         role="user",
