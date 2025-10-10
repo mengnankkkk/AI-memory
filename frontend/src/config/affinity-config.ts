@@ -218,7 +218,7 @@ export const COMPANION_PROFILES: Record<string, {
     id: 'kevin',
     name: '凯文',
     archetype: '铁哥们',
-    defaultGreeting: '哟！兄弟！最近怎么样？',
+    defaultGreeting: '（理解地点点头）行，兄弟你先忙。工作要紧，bug要赶紧修，别到时候老板找你谈心了。(递给你一罐冰镇可乐)加油，等你有空了我们再聊游戏！',
     traits: ['热情', '直爽', '义气']
   },
   zoe: {

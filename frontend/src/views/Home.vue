@@ -1,18 +1,19 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, ref, computed, reactive } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import api from '@/services/auth'
 import { romanceApi } from '@/services/romance'
 import CompanionAvatar from '@/components/CompanionAvatar.vue'
 import LevelUpModal from '@/components/LevelUpModal.vue'
 import { getLevelConfig, getLevelByScore, getLevelProgress } from '@/config/affinity-config'
+import type { CompanionStateResponse } from '@/types/romance'
 
 const router = useRouter()
 const authStore = useAuthStore()
 
 const systemCompanions = ref<any[]>([])
-const companionStates = ref<Record<number, any>>({})
+const companionStates = reactive<Record<number, CompanionStateResponse>>({})
 const loading = ref(true)
 const loadingStates = ref(true)
 
@@ -65,21 +66,32 @@ const loadCompanionStates = async () => {
   loadingStates.value = true
   const userId = authStore.user?.id?.toString() || 'default'
 
+  for (const key of Object.keys(companionStates)) {
+    delete companionStates[Number(key)]
+  }
+
   for (const companion of systemCompanions.value) {
     try {
       const state = await romanceApi.getCompanionState(companion.id, userId)
-      companionStates.value[companion.id] = state
+      companionStates[companion.id] = state
       console.log(`角色 ${companion.name} 状态:`, state)
     } catch (error) {
       console.error(`加载角色${companion.id}状态失败:`, error)
       // 使用默认状态
-      companionStates.value[companion.id] = {
+      companionStates[companion.id] = {
         affinity_score: 50,
-        romance_level: 'stranger',
         trust_score: 10,
         tension_score: 0,
+        romance_level: 'stranger',
+        current_mood: '平静',
+        mood_last_updated: Math.floor(Date.now() / 1000),
+        last_interaction_at: Math.floor(Date.now() / 1000),
         total_interactions: 0,
-        days_since_first_meet: 0
+        days_since_first_meet: 0,
+        special_events_triggered: [],
+        gifts_received: [],
+        outfit_unlocked: [],
+        memories: []
       }
     }
   }
@@ -88,14 +100,26 @@ const loadCompanionStates = async () => {
 }
 
 // 获取角色状态
-const getCompanionState = (companionId: number) => {
-  return companionStates.value[companionId] || {
+const getCompanionState = (companionId: number): CompanionStateResponse => {
+  if (companionStates[companionId]) {
+    return companionStates[companionId]
+  }
+
+  const fallbackTimestamp = Math.floor(Date.now() / 1000)
+  return {
     affinity_score: 50,
-    romance_level: 'stranger',
     trust_score: 10,
     tension_score: 0,
+    romance_level: 'stranger',
+    current_mood: '平静',
+    mood_last_updated: fallbackTimestamp,
+    last_interaction_at: fallbackTimestamp,
     total_interactions: 0,
-    days_since_first_meet: 0
+    days_since_first_meet: 0,
+    special_events_triggered: [],
+    gifts_received: [],
+    outfit_unlocked: [],
+    memories: []
   }
 }
 

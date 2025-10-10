@@ -74,7 +74,7 @@ SYSTEM_COMPANIONS: List[Dict] = [
         "name": "凯文",
         "avatar_id": "kevin",
         "personality_archetype": "kevin",
-        "custom_greeting": "哟！兄弟，我是凯文！_(:з」∠)_ 今天又有什么破事要吐槽吗？",
+        "custom_greeting": "（理解地点点头）行，兄弟你先忙。工作要紧，bug要赶紧修，别到时候老板找你谈心了。(递给你一罐冰镇可乐)加油，等你有空了我们再聊游戏！",
         "description": "技术宅朋友",
         "prompt_version": "v1",
     },
