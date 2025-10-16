@@ -78,18 +78,19 @@ class RomanceApi {
   /**
    * 获取商店物品
    */
-  async getStoreItems(itemType?: string, rarity?: string): Promise<StoreItemResponse[]> {
+  async getStoreItems(userId: string, itemType?: string, rarity?: string): Promise<StoreItemResponse[]> {
     const params = new URLSearchParams()
+    params.append('user_id', userId)
     if (itemType) params.append('item_type', itemType)
     if (rarity) params.append('rarity', rarity)
-    
-    const url = `${API_BASE}/store/items${params.toString() ? '?' + params.toString() : ''}`
+
+    const url = `${API_BASE}/store/items?${params.toString()}`
     const { data } = await api.get(url)
-    
-    // 为礼物添加表情符号
+
+    // preview_url 现在包含 emoji
     return data.map((item: StoreItemResponse) => ({
       ...item,
-      emoji: this.getGiftEmoji(item.item_type)
+      emoji: item.preview_url || '🎁'
     }))
   }
 

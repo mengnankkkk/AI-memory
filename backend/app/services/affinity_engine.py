@@ -234,6 +234,23 @@ class AffinityEngine:
         except Exception as e:
             logger.warning(f"[AffinityEngine] 数据库自动更新失败，但不影响主流程: {e}")
 
+        # 🎯 检查并触发事件
+        try:
+            from app.services.event_engine import event_engine
+            triggered_events = await event_engine.check_and_trigger_events(
+                user_id=user_id,
+                companion_id=companion_id,
+                companion_name=companion_name,
+                old_level=current_level,
+                new_level=new_level,
+                new_affinity_score=new_affinity_score,
+                level_up=level_up
+            )
+            if triggered_events:
+                logger.info(f"[AffinityEngine] 触发了 {len(triggered_events)} 个事件")
+        except Exception as e:
+            logger.warning(f"[AffinityEngine] 事件触发失败，但不影响主流程: {e}")
+
         return ProcessResult(
             emotion_analysis=emotion_analysis,
             affinity_change=protection_result.adjusted_change,

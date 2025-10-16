@@ -122,6 +122,7 @@ class StoreItemResponse(BaseModel):
     currency: str  # coins, gems
     preview_url: Optional[str]
     rarity: str  # common, rare, epic, legendary
+    quantity: Optional[int] = 0  # 用户库存数量
 
 
 class UserCurrencyResponse(BaseModel):

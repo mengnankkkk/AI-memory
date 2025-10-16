@@ -6,14 +6,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
 from app.models.companion import Companion
+from app.models.gift import UserGiftInventory
 from app.api.schemas_romance import (
-    CompanionStateResponse, GiftRequest, GiftResponse, 
+    CompanionStateResponse, GiftRequest, GiftResponse,
     RandomEventResponse, InteractionAnalysisRequest, InteractionAnalysisResponse,
     DailyTaskResponse, StoreItemResponse, UserCurrencyResponse
 )
 from app.services.redis_utils import (
     redis_affinity_manager, redis_event_manager, redis_stats_manager
 )
+from app.core.gift_config import get_all_gifts, get_gift_by_id
 from typing import List, Optional
 import logging
 import json
@@ -77,47 +79,70 @@ async def give_gift(
         # 系统伙伴（user_id=1）对所有用户可见，用户自建伙伴只对创建者可见
         if companion.user_id != 1 and companion.user_id != int(gift_request.user_id):
             raise HTTPException(status_code=403, detail="无权访问此伙伴")
-        
+
+        # 获取礼物配置
+        gift_config = get_gift_by_id(gift_request.gift_type)
+        if not gift_config:
+            raise HTTPException(status_code=400, detail="未知的礼物类型")
+
+        # 检查用户库存
+        stmt_inventory = select(UserGiftInventory).where(
+            UserGiftInventory.user_id == gift_request.user_id,
+            UserGiftInventory.gift_id == gift_request.gift_type
+        )
+        result_inventory = await db.execute(stmt_inventory)
+        inventory = result_inventory.scalar_one_or_none()
+
+        if not inventory or inventory.quantity <= 0:
+            raise HTTPException(status_code=400, detail=f"库存不足！{gift_config['name']}数量为0")
+
+        # 扣除库存
+        inventory.quantity -= 1
+        await db.commit()
+
         # 获取赠送前的状态
         old_state = await redis_affinity_manager.get_companion_state(
             gift_request.user_id, companion_id
         )
         old_affinity = old_state.get("affinity_score", 50) if old_state else 50
-        
-        # 赠送礼物
-        success = await redis_affinity_manager.give_gift(
-            gift_request.user_id, companion_id, 
-            gift_request.gift_type, gift_request.gift_name
+
+        # 使用配置中的好感度增益
+        await redis_affinity_manager.update_affinity(
+            gift_request.user_id,
+            companion_id,
+            gift_config["affinity_bonus"],
+            gift_config.get("trust_bonus", 0),
+            gift_config.get("tension_bonus", 0),
+            "gift"
         )
-        
-        if not success:
-            raise HTTPException(status_code=500, detail="赠送礼物失败")
-        
+
         # 获取赠送后的状态
         new_state = await redis_affinity_manager.get_companion_state(
             gift_request.user_id, companion_id
         )
         new_affinity = new_state.get("affinity_score", 50) if new_state else 50
         affinity_change = new_affinity - old_affinity
-        
+
         # 生成伙伴反应（使用英文键名）
         companion_reaction = _generate_gift_reaction(
             gift_request.gift_type, companion.personality_archetype,
             new_state.get("romance_level", "stranger")
         )
-        
+
         # 记录统计
         await redis_stats_manager.increment_counter("gifts_given")
         await redis_stats_manager.increment_counter(f"gift_type_{gift_request.gift_type}")
-        
+
+        logger.info(f"[GiftSystem] {gift_request.user_id} 赠送 {gift_config['name']} 给 {companion.name}，库存剩余: {inventory.quantity}")
+
         return GiftResponse(
             success=True,
-            message=f"成功赠送{gift_request.gift_name}",
+            message=f"成功赠送{gift_config['name']}（剩余{inventory.quantity}个）",
             affinity_change=affinity_change,
             new_affinity_score=new_affinity,
             companion_reaction=companion_reaction
         )
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -299,16 +324,48 @@ async def get_daily_tasks(
 
 @router.get("/store/items", response_model=List[StoreItemResponse])
 async def get_store_items(
+    user_id: str = Query(..., description="用户ID"),
     item_type: Optional[str] = Query(None, description="物品类型"),
-    rarity: Optional[str] = Query(None, description="稀有度")
+    rarity: Optional[str] = Query(None, description="稀有度"),
+    db: AsyncSession = Depends(get_db)
 ):
-    """获取商店物品"""
+    """获取商店物品（含用户库存）"""
     try:
-        # 这里应该从数据库或配置文件中读取商店物品
-        # 目前返回示例数据
-        items = _get_store_items(item_type, rarity)
+        # 获取所有礼物配置
+        gift_configs = get_all_gifts()
+
+        # 获取用户库存
+        stmt = select(UserGiftInventory).where(UserGiftInventory.user_id == user_id)
+        result = await db.execute(stmt)
+        inventories = result.scalars().all()
+
+        # 创建库存字典
+        inventory_dict = {inv.gift_id: inv.quantity for inv in inventories}
+
+        # 构建礼物列表
+        items = []
+        for gift in gift_configs:
+            # 过滤条件
+            if item_type and gift["gift_type"] != item_type:
+                continue
+            if rarity and gift["rarity"] != rarity:
+                continue
+
+            item = StoreItemResponse(
+                item_id=gift["gift_id"],
+                item_type=gift["gift_type"],
+                name=gift["name"],
+                description=gift["description"],
+                price=gift["price"],
+                currency=gift["currency"],
+                preview_url=gift.get("emoji", "🎁"),  # 使用emoji作为预览
+                rarity=gift["rarity"],
+                quantity=inventory_dict.get(gift["gift_id"], 0)  # 添加库存数量
+            )
+            items.append(item)
+
         return items
-    
+
     except Exception as e:
         logger.error(f"[get_store_items] {e}")
         raise HTTPException(status_code=500, detail="服务器内部错误")

@@ -17,6 +17,7 @@ from app.models.event import (
     OfflineLifeLog,
     EventTemplate
 )
+from app.models.gift import UserGiftInventory
 
 __all__ = [
     # 基础模型
@@ -35,4 +36,7 @@ __all__ = [
     "UserEventHistory",
     "OfflineLifeLog",
     "EventTemplate",
+
+    # 礼物系统模型
+    "UserGiftInventory",
 ]

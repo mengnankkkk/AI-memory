@@ -75,16 +75,24 @@
     <div class="gift-section">
       <h4>赠送礼物</h4>
       <div class="gift-grid">
-        <div 
-          v-for="gift in availableGifts" 
+        <div
+          v-for="gift in availableGifts"
           :key="gift.item_id"
           class="gift-item"
-          :class="{ affordable: canAfford(gift) }"
+          :class="{
+            affordable: canAfford(gift),
+            'out-of-stock': !gift.quantity || gift.quantity <= 0
+          }"
           @click="selectGift(gift)"
         >
           <div class="gift-icon">{{ gift.emoji }}</div>
           <div class="gift-name">{{ gift.name }}</div>
-          <div class="gift-price">{{ gift.price }} 💰</div>
+          <div class="gift-quantity" :class="{ 'low-stock': gift.quantity && gift.quantity <= 2 }">
+            库存: {{ gift.quantity || 0 }}
+          </div>
+          <div class="gift-rarity" :class="`rarity-${gift.rarity}`">
+            {{ getRarityText(gift.rarity) }}
+          </div>
         </div>
       </div>
     </div>
@@ -218,9 +226,13 @@ const loadDailyTasks = async () => {
 
 const loadGifts = async () => {
   try {
-    availableGifts.value = await romanceApi.getStoreItems('gift')
+    console.log('[RomancePanel] 开始加载礼物列表, userId:', props.userId)
+    const gifts = await romanceApi.getStoreItems(props.userId, 'gift')
+    console.log('[RomancePanel] 礼物列表加载成功:', gifts.length, '个礼物')
+    console.log('[RomancePanel] 礼物详情:', gifts)
+    availableGifts.value = gifts
   } catch (error) {
-    console.error('加载礼物列表失败:', error)
+    console.error('[RomancePanel] 加载礼物列表失败:', error)
   }
 }
 
@@ -242,33 +254,42 @@ const loadUserCurrency = async () => {
 }
 
 const selectGift = async (gift: StoreItemResponse) => {
-  if (!canAfford(gift)) {
-    alert('金币不足！')
+  // 检查库存
+  if (!gift.quantity || gift.quantity <= 0) {
+    alert('库存不足！请等待补货或购买更多礼物')
     return
   }
 
   try {
-    // 从item_id中提取gift_type（如 "flower_rose" -> "flower"）
-    const giftType = gift.item_id.split('_')[0]
-
     const response = await romanceApi.giveGift(props.companionId, {
-      gift_type: giftType,
+      gift_type: gift.item_id,
       gift_name: gift.name,
       user_id: props.userId
     })
-    
+
     if (response.success) {
-      alert(`${response.companion_reaction}`)
-      // 刷新状态
+      alert(`${response.companion_reaction}\n\n好感度 +${response.affinity_change}`)
+      // 刷新状态和礼物列表
       await Promise.all([
         loadCompanionState(),
-        loadUserCurrency()
+        loadGifts()
       ])
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('赠送礼物失败:', error)
-    alert('赠送失败，请稍后重试')
+    const errorMsg = error.response?.data?.detail || '赠送失败，请稍后重试'
+    alert(errorMsg)
   }
+}
+
+const getRarityText = (rarity: string): string => {
+  const rarityMap: Record<string, string> = {
+    'common': '普通',
+    'rare': '稀有',
+    'epic': '史诗',
+    'legendary': '传说'
+  }
+  return rarityMap[rarity] || rarity
 }
 
 const handleEvent = async (event: EventResponse) => {
@@ -309,6 +330,7 @@ const formatMemoryTime = (timestamp: number): string => {
 
 // 生命周期
 onMounted(async () => {
+  console.log('[RomancePanel] 组件挂载, props:', props)
   await Promise.all([
     loadCompanionState(),
     loadDailyTasks(),
@@ -316,6 +338,7 @@ onMounted(async () => {
     loadPendingEvents(),
     loadUserCurrency()
   ])
+  console.log('[RomancePanel] 所有数据加载完成, availableGifts:', availableGifts.value.length, '个')
 })
 
 // 监听 companionId 变化
@@ -515,6 +538,17 @@ setInterval(() => {
   border-color: #10b981;
 }
 
+.gift-item.out-of-stock {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: grayscale(0.8);
+}
+
+.gift-item.out-of-stock:hover {
+  transform: none;
+  box-shadow: none;
+}
+
 .gift-icon {
   font-size: 2rem;
   margin-bottom: 8px;
@@ -524,6 +558,54 @@ setInterval(() => {
   font-size: 0.875rem;
   color: #374151;
   margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.gift-quantity {
+  font-size: 0.75rem;
+  color: #10b981;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.gift-quantity.low-stock {
+  color: #f59e0b;
+  font-weight: 600;
+}
+
+.gift-rarity {
+  font-size: 0.65rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.rarity-common {
+  background: #e5e7eb;
+  color: #6b7280;
+}
+
+.rarity-rare {
+  background: #bfdbfe;
+  color: #2563eb;
+}
+
+.rarity-epic {
+  background: #f9a8d4;
+  color: #be185d;
+}
+
+.rarity-legendary {
+  background: #fde68a;
+  color: #d97706;
+  animation: legendary-glow 2s infinite;
+}
+
+@keyframes legendary-glow {
+  0%, 100% { box-shadow: 0 0 5px rgba(217, 119, 6, 0.5); }
+  50% { box-shadow: 0 0 15px rgba(217, 119, 6, 0.8); }
 }
 
 .gift-price {

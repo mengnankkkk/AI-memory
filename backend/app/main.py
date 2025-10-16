@@ -15,6 +15,7 @@ from app.api.stats import router as stats_router
 from app.api.romance import router as romance_router
 from app.api.auth import router as auth_router  # 用户认证路由
 from app.api.offline_life import router as offline_life_router  # 离线生活路由
+from app.api.events import router as events_router  # 事件系统路由
 from app.services.timeline_scheduler import timeline_scheduler  # 时间线调度器
 import socketio
 
@@ -66,6 +67,7 @@ app.include_router(notification_router, prefix="/api")
 app.include_router(stats_router, prefix="/api")
 app.include_router(romance_router, prefix="/api")
 app.include_router(offline_life_router, prefix="/api")  # 离线生活路由
+app.include_router(events_router, prefix="/api")  # 事件系统路由
 
 # 创建 Socket.IO 服务器
 sio = socketio.AsyncServer(

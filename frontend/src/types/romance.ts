@@ -100,6 +100,7 @@ export interface StoreItemResponse {
   currency: string
   preview_url: string | null
   rarity: string
+  quantity?: number // 用户库存数量
   emoji?: string // 前端显示用的表情符号
 }
 

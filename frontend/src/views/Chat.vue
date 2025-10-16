@@ -1,15 +1,17 @@
 <script setup lang="ts">
-import { ref, onMounted, nextTick, onBeforeUnmount, computed } from 'vue'
+import { ref, onMounted, nextTick, onBeforeUnmount, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { companionService } from '@/services/companion'
 import { useUserStore } from '@/stores/user'
 import { useWebSocketChat } from '@/services/websocket'
 import RomancePanel from '@/components/RomancePanel.vue'
 import CompanionAvatar from '@/components/CompanionAvatar.vue'
+import EventCard from '@/components/EventCard.vue'
 import type { Companion, ChatMessage } from '@/types'
 import api from '@/services/auth'
 import { romanceApi } from '@/services/romance'
 import { getLevelConfig, getLevelProgress, type AffinityLevelConfig } from '@/config/affinity-config'
+import { eventApi, type EventData } from '@/services/event'
 
 const route = useRoute()
 const router = useRouter()
@@ -47,6 +49,10 @@ const romanceLevel = ref<string>('')
 const showAffinityChange = ref(false)
 const affinityDelta = ref(0)
 let affinityTimeout: ReturnType<typeof setTimeout> | null = null
+
+// 事件系统相关状态
+const pendingEvents = ref<EventData[]>([])
+const currentEvent = ref<EventData | null>(null)
 
 // 计算等级配置
 const levelConfig = computed<AffinityLevelConfig | null>(() => {
@@ -118,8 +124,71 @@ const refreshAffinityState = async () => {
         }, 1500)
       }
     }
+    // 刷新好感度后检查事件
+    await loadPendingEvents()
   } catch (error) {
     console.error('刷新好感度失败:', error)
+  }
+}
+
+// 加载待处理事件
+const loadPendingEvents = async () => {
+  try {
+    const events = await eventApi.getPendingEvents(companionId)
+    pendingEvents.value = events
+
+    // 如果有未完成的事件，显示第一个
+    if (events.length > 0 && !currentEvent.value) {
+      currentEvent.value = events[0]
+      // 设置companion_name
+      if (companion.value) {
+        currentEvent.value.companion_name = companion.value.name
+      }
+    }
+  } catch (error) {
+    console.error('加载事件失败:', error)
+  }
+}
+
+// 处理事件交互
+const handleEventInteract = async (historyId: number) => {
+  if (!currentEvent.value) return
+
+  // 将事件注入到对话上下文
+  const eventContext = `[刚才发生的事情] ${currentEvent.value.script_content.description.replace(/\{name\}/g, companion.value?.name || '伙伴')}`
+  userInput.value = `${eventContext}\n\n我想和你聊聊这件事...`
+
+  // 标记事件为已完成
+  try {
+    await eventApi.completeEvent(historyId, 'conversation_triggered')
+    pendingEvents.value = pendingEvents.value.filter(e => e.history_id !== historyId)
+    currentEvent.value = pendingEvents.value[0] || null
+    if (currentEvent.value && companion.value) {
+      currentEvent.value.companion_name = companion.value.name
+    }
+  } catch (error) {
+    console.error('完成事件失败:', error)
+  }
+
+  // 发送消息
+  await sendMessage()
+}
+
+// 关闭事件卡片
+const closeEventCard = async () => {
+  if (currentEvent.value) {
+    try {
+      await eventApi.completeEvent(currentEvent.value.history_id, 'dismissed')
+      pendingEvents.value = pendingEvents.value.filter(
+        e => e.history_id !== currentEvent.value!.history_id
+      )
+      currentEvent.value = pendingEvents.value[0] || null
+      if (currentEvent.value && companion.value) {
+        currentEvent.value.companion_name = companion.value.name
+      }
+    } catch (error) {
+      console.error('关闭事件失败:', error)
+    }
   }
 }
 
@@ -334,6 +403,7 @@ async function feedback(msg: ChatMessage, score: number) {
 
 onMounted(async () => {
   await loadCompanion()
+  await loadPendingEvents()
   initWebSocket()
 })
 
@@ -459,6 +529,15 @@ onBeforeUnmount(() => {
         class="flex-1 overflow-y-auto px-6 py-6"
       >
         <div class="max-w-4xl mx-auto space-y-4">
+          <!-- 事件卡片（置顶显示） -->
+          <div v-if="currentEvent" class="mb-6">
+            <EventCard
+              :event="currentEvent"
+              @interact="handleEventInteract"
+              @close="closeEventCard"
+            />
+          </div>
+
           <div
             v-for="(msg, index) in messages"
             :key="index"
