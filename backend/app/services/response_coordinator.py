@@ -18,6 +18,7 @@ from app.services.emotion_expression_generator import emotion_expression_generat
 from app.services.dynamic_prompt_builder import dynamic_prompt_builder
 from app.services.llm.factory import llm_service
 from app.services.memory_integration import memory_system
+from app.services.task_manager import task_manager
 
 logger = logging.getLogger("response_coordinator")
 
@@ -230,15 +231,26 @@ class ResponseCoordinator:
             }
 
             # ==========================================
-            # 阶段4: 后处理（记忆存储、状态持久化）
+            # 阶段4: 后处理（记忆存储、状态持久化、任务检测）
             # ==========================================
+
+            # 4.1 存储重要记忆
             if enable_memory and process_result.emotion_analysis.is_memorable:
-                self.logger.info("\n💾 阶段4: 存储重要记忆")
+                self.logger.info("\n💾 阶段4.1: 存储重要记忆")
                 await self._store_memory(
                     user_id, companion_id,
                     user_message, ai_response,
                     process_result.emotion_analysis
                 )
+
+            # 4.2 任务自动完成检测
+            self.logger.info("\n🎯 阶段4.2: 任务自动完成检测")
+            await self._check_and_complete_tasks(
+                user_id=user_id,
+                companion_id=companion_id,
+                user_message=user_message,
+                emotion_analysis=process_result.emotion_analysis
+            )
 
             # 构建最终响应
             coordinated_response = CoordinatedResponse(
@@ -325,6 +337,111 @@ class ResponseCoordinator:
             self.logger.info("💾 记忆存储成功")
         except Exception as e:
             self.logger.warning(f"记忆存储失败: {e}")
+
+    async def _check_and_complete_tasks(
+        self,
+        user_id: str,
+        companion_id: int,
+        user_message: str,
+        emotion_analysis: EmotionAnalysis
+    ):
+        """
+        检查并自动完成任务
+
+        Args:
+            user_id: 用户ID
+            companion_id: 伙伴ID
+            user_message: 用户消息内容
+            emotion_analysis: 情感分析结果
+        """
+        try:
+            total_task_rewards = 0  # 累计任务奖励
+
+            # 1. 聊天任务 - 每次对话都计数
+            chat_result = await task_manager.check_and_complete_task_automatically(
+                user_id=user_id,
+                companion_id=companion_id,
+                interaction_type="chat",
+                message_content=user_message
+            )
+            if chat_result and chat_result.get("success"):
+                reward = chat_result.get('reward', 0)
+                total_task_rewards += reward
+                self.logger.info(f"✅ 自动完成聊天任务，奖励: +{reward} 好感度")
+            elif chat_result and chat_result.get("milestone_rewards"):
+                for milestone in chat_result["milestone_rewards"]:
+                    milestone_reward = milestone.get('bonus', 0)
+                    total_task_rewards += milestone_reward
+                    self.logger.info(f"🏆 达成里程碑：进度 {milestone['progress']}，奖励: +{milestone_reward}")
+
+            # 2. 赞美任务 - 检测正面情感
+            if emotion_analysis.primary_emotion in ["joy", "love", "admiration", "positive"]:
+                compliment_result = await task_manager.check_and_complete_task_automatically(
+                    user_id=user_id,
+                    companion_id=companion_id,
+                    interaction_type="compliment",
+                    message_content=user_message
+                )
+                if compliment_result and compliment_result.get("success"):
+                    reward = compliment_result.get('reward', 0)
+                    total_task_rewards += reward
+                    self.logger.info(f"✅ 自动完成赞美任务，奖励: +{reward} 好感度")
+
+            # 3. 浪漫任务 - 检测浪漫关键词
+            romantic_result = await task_manager.check_and_complete_task_automatically(
+                user_id=user_id,
+                companion_id=companion_id,
+                interaction_type="romantic",
+                message_content=user_message
+            )
+            if romantic_result and romantic_result.get("success"):
+                reward = romantic_result.get('reward', 0)
+                total_task_rewards += reward
+                self.logger.info(f"✅ 自动完成浪漫任务，奖励: +{reward} 好感度")
+
+            # 4. 早安任务 - 检测早安关键词
+            morning_result = await task_manager.check_and_complete_task_automatically(
+                user_id=user_id,
+                companion_id=companion_id,
+                interaction_type="morning_greeting",
+                message_content=user_message
+            )
+            if morning_result and morning_result.get("success"):
+                reward = morning_result.get('reward', 0)
+                total_task_rewards += reward
+                self.logger.info(f"✅ 自动完成早安任务，奖励: +{reward} 好感度")
+
+            # 5. 晚安任务 - 检测晚安关键词
+            night_result = await task_manager.check_and_complete_task_automatically(
+                user_id=user_id,
+                companion_id=companion_id,
+                interaction_type="night_greeting",
+                message_content=user_message
+            )
+            if night_result and night_result.get("success"):
+                reward = night_result.get('reward', 0)
+                total_task_rewards += reward
+                self.logger.info(f"✅ 自动完成晚安任务，奖励: +{reward} 好感度")
+
+            # 如果有任务奖励，更新数据库中的好感度
+            if total_task_rewards > 0:
+                self.logger.info(f"🎁 任务奖励总计: +{total_task_rewards} 好感度，正在更新数据库...")
+                try:
+                    # 使用 affinity_engine 更新数据库
+                    await affinity_engine.update_database(
+                        user_id=user_id,
+                        companion_id=companion_id,
+                        affinity_change=total_task_rewards,
+                        trust_change=0,
+                        tension_change=0,
+                        interaction_type="task"
+                    )
+                    self.logger.info(f"✅ 任务奖励已更新到数据库")
+                except Exception as e:
+                    self.logger.warning(f"⚠️ 任务奖励更新数据库失败: {e}")
+
+        except Exception as e:
+            self.logger.warning(f"⚠️ 任务检测失败: {e}")
 
     def _build_working_memory(
         self,

@@ -87,8 +87,20 @@ export interface DailyTaskResponse {
   task_type: string
   description: string
   reward_affinity: number
+  reward_coins?: number  // 金币奖励
+  current_progress: number  // 当前进度
+  max_progress: number  // 最大进度
+  difficulty: 'easy' | 'medium' | 'hard' | 'challenge'  // 难度
   completed: boolean
   deadline: string | null
+  milestones?: TaskMilestone[]  // 里程碑奖励
+  reward_type?: 'affinity' | 'coins' | 'gems' | 'mixed'  // 奖励类型
+}
+
+export interface TaskMilestone {
+  progress: number
+  bonus: number
+  type?: string
 }
 
 export interface StoreItemResponse {

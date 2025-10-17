@@ -49,23 +49,68 @@
 
     <!-- 每日任务 -->
     <div class="daily-tasks" v-if="dailyTasks && dailyTasks.length > 0">
-      <h4>今日任务</h4>
+      <div class="tasks-header">
+        <div class="header-left">
+          <h4>今日任务</h4>
+          <TaskBadge :count="incompleteTaskCount" :is-urgent="isTaskUrgent" />
+        </div>
+        <div class="completion-stats">
+          <span class="completion-text">完成率</span>
+          <span class="completion-value" :class="{ high: taskCompletionRate >= 80, medium: taskCompletionRate >= 50 && taskCompletionRate < 80 }">
+            {{ taskCompletionRate }}%
+          </span>
+        </div>
+      </div>
+
+      <!-- 紧急任务提醒 -->
+      <div v-if="isTaskUrgent" class="urgent-reminder">
+        <i class="fas fa-exclamation-triangle"></i>
+        <span>有 {{ urgentTasksCount }} 个任务即将过期！</span>
+      </div>
+
       <div class="task-list">
-        <div 
-          v-for="task in dailyTasks" 
+        <div
+          v-for="task in dailyTasks"
           :key="task.task_id"
           class="task-item"
-          :class="{ completed: task.completed }"
+          :class="{
+            completed: task.completed,
+            clickable: !task.completed,
+            urgent: !task.completed && isTaskUrgentCheck(task),
+            highlighted: !task.completed
+          }"
+          @click="completeTask(task)"
         >
           <div class="task-icon">
             <i :class="getTaskIcon(task.task_type)"></i>
           </div>
           <div class="task-content">
-            <div class="task-description">{{ task.description }}</div>
-            <div class="task-reward">+{{ task.reward_affinity }} 好感度</div>
+            <div class="task-header">
+              <div class="task-description">{{ task.description }}</div>
+              <div class="task-difficulty" :style="{ color: getDifficultyConfig(task.difficulty).color }">
+                <span class="difficulty-icon">{{ getDifficultyConfig(task.difficulty).icon }}</span>
+                <span class="difficulty-text">{{ getDifficultyConfig(task.difficulty).name }}</span>
+              </div>
+            </div>
+
+            <!-- 进度条（仅多步骤任务） -->
+            <TaskProgressBar
+              v-if="hasProgress(task)"
+              :current-progress="task.current_progress"
+              :max-progress="task.max_progress"
+              :milestones="task.milestones"
+            />
+
+            <div class="task-meta">
+              <span class="task-reward">{{ getRewardText(task) }}</span>
+              <span v-if="!task.completed && getTaskTimeRemaining(task)" class="task-deadline">
+                {{ getTaskTimeRemaining(task) }}
+              </span>
+            </div>
           </div>
           <div class="task-status">
             <i v-if="task.completed" class="fas fa-check-circle"></i>
+            <i v-else class="fas fa-circle task-uncompleted"></i>
           </div>
         </div>
       </div>
@@ -123,8 +168,8 @@
     <div class="memories-section" v-if="recentMemories && recentMemories.length > 0">
       <h4>珍贵回忆</h4>
       <div class="memories-list">
-        <div 
-          v-for="memory in recentMemories" 
+        <div
+          v-for="memory in recentMemories"
           :key="memory.timestamp"
           class="memory-item"
         >
@@ -133,12 +178,58 @@
         </div>
       </div>
     </div>
+
+    <!-- 礼物反馈弹窗 -->
+    <GiftFeedback
+      :visible="giftFeedback.visible"
+      :gift-emoji="giftFeedback.giftEmoji"
+      :gift-name="giftFeedback.giftName"
+      :companion-reaction="giftFeedback.companionReaction"
+      :affinity-change="giftFeedback.affinityChange"
+      :old-affinity="giftFeedback.oldAffinity"
+      :new-affinity="giftFeedback.newAffinity"
+      @close="closeFeedback"
+    />
+
+    <!-- 等级提升闪卡 -->
+    <LevelUpCard
+      :visible="levelUpCard.visible"
+      :companion-id="companionId"
+      :companion-name="companionName"
+      :old-level="levelUpCard.oldLevel"
+      :new-level="levelUpCard.newLevel"
+      :current-affinity="levelUpCard.currentAffinity"
+      @close="closeLevelUpCard"
+    />
+
+    <!-- 任务完成反馈 -->
+    <TaskFeedback
+      :visible="taskFeedback.visible"
+      :task-icon="taskFeedback.taskIcon"
+      :task-description="taskFeedback.taskDescription"
+      :reward="taskFeedback.reward"
+      @close="closeTaskFeedback"
+    />
+
+    <!-- 新任务通知 -->
+    <TaskNotification
+      :visible="taskNotification.visible"
+      :tasks="dailyTasks"
+      @close="closeTaskNotification"
+      @go-to-tasks="scrollToTasks"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { romanceApi } from '@/services/romance'
+import GiftFeedback from './GiftFeedback.vue'
+import LevelUpCard from './LevelUpCard.vue'
+import TaskFeedback from './TaskFeedback.vue'
+import TaskBadge from './TaskBadge.vue'
+import TaskNotification from './TaskNotification.vue'
+import TaskProgressBar from './TaskProgressBar.vue'
 import type {
   CompanionStateResponse,
   DailyTaskResponse,
@@ -162,6 +253,44 @@ const availableGifts = ref<StoreItemResponse[]>([])
 const pendingEvents = ref<EventResponse[]>([])
 const userCurrency = ref({ coins: 0, gems: 0 })
 const loading = ref(false)
+
+// 礼物反馈数据
+const giftFeedback = ref({
+  visible: false,
+  giftEmoji: '🎁',
+  giftName: '',
+  companionReaction: '',
+  affinityChange: 0,
+  oldAffinity: 0,
+  newAffinity: 0
+})
+
+// 等级提升卡片数据
+const levelUpCard = ref({
+  visible: false,
+  oldLevel: 'stranger',
+  newLevel: 'stranger',
+  currentAffinity: 0
+})
+
+// 任务完成反馈数据
+const taskFeedback = ref({
+  visible: false,
+  taskIcon: '⭐',
+  taskDescription: '',
+  reward: 0
+})
+
+// 新任务通知
+const taskNotification = ref({
+  visible: false
+})
+
+// 上次任务检查日期（用于检测新的一天）
+const lastTaskCheckDate = ref<string | null>(null)
+
+// 记录上次的等级
+const previousLevel = ref<string | null>(null)
 
 // 计算属性
 const affinityPercentage = computed(() => {
@@ -204,11 +333,65 @@ const recentMemories = computed(() => {
     .slice(0, 3)
 })
 
+// 任务相关计算属性
+const incompleteTasks = computed(() => {
+  return dailyTasks.value.filter(task => !task.completed)
+})
+
+const incompleteTaskCount = computed(() => {
+  return incompleteTasks.value.length
+})
+
+const taskCompletionRate = computed(() => {
+  if (dailyTasks.value.length === 0) return 0
+  const completed = dailyTasks.value.filter(task => task.completed).length
+  return Math.round((completed / dailyTasks.value.length) * 100)
+})
+
+const isTaskUrgent = computed(() => {
+  // 检查是否有任务快过期（剩余时间<6小时）
+  const now = new Date()
+  return incompleteTasks.value.some(task => {
+    const deadline = new Date(task.deadline)
+    const hoursRemaining = (deadline.getTime() - now.getTime()) / (1000 * 60 * 60)
+    return hoursRemaining > 0 && hoursRemaining < 6
+  })
+})
+
+const urgentTasksCount = computed(() => {
+  const now = new Date()
+  return incompleteTasks.value.filter(task => {
+    const deadline = new Date(task.deadline)
+    const hoursRemaining = (deadline.getTime() - now.getTime()) / (1000 * 60 * 60)
+    return hoursRemaining > 0 && hoursRemaining < 6
+  }).length
+})
+
 // 方法
 const loadCompanionState = async () => {
   try {
     loading.value = true
-    companionState.value = await romanceApi.getCompanionState(props.companionId, props.userId)
+    const newState = await romanceApi.getCompanionState(props.companionId, props.userId)
+
+    // 检测等级变化
+    if (companionState.value && previousLevel.value) {
+      const oldLevel = companionState.value.romance_level
+      const newLevel = newState.romance_level
+
+      // 如果等级提升了，显示闪卡
+      if (oldLevel !== newLevel && !isFirstLoad(oldLevel, newLevel)) {
+        levelUpCard.value = {
+          visible: true,
+          oldLevel: oldLevel,
+          newLevel: newLevel,
+          currentAffinity: newState.affinity_score
+        }
+      }
+    }
+
+    // 更新状态
+    companionState.value = newState
+    previousLevel.value = newState.romance_level
   } catch (error) {
     console.error('加载伙伴状态失败:', error)
   } finally {
@@ -216,9 +399,31 @@ const loadCompanionState = async () => {
   }
 }
 
+// 判断是否是首次加载（避免初始化时显示闪卡）
+const isFirstLoad = (oldLevel: string, newLevel: string): boolean => {
+  // 如果previousLevel为null，说明是首次加载
+  return previousLevel.value === null
+}
+
 const loadDailyTasks = async () => {
   try {
     dailyTasks.value = await romanceApi.getDailyTasks(props.companionId, props.userId)
+
+    // 检测是否是新的一天
+    const today = new Date().toDateString()
+    if (lastTaskCheckDate.value !== today && dailyTasks.value.length > 0) {
+      // 如果有未完成的任务，显示通知
+      const hasIncompleteTasks = dailyTasks.value.some(task => !task.completed)
+      if (hasIncompleteTasks && lastTaskCheckDate.value !== null) {
+        // 延迟1秒显示通知，避免页面加载时立即弹出
+        setTimeout(() => {
+          taskNotification.value.visible = true
+        }, 1000)
+      }
+      lastTaskCheckDate.value = today
+      // 保存到localStorage
+      localStorage.setItem(`lastTaskCheck_${props.companionId}_${props.userId}`, today)
+    }
   } catch (error) {
     console.error('加载每日任务失败:', error)
   }
@@ -261,6 +466,9 @@ const selectGift = async (gift: StoreItemResponse) => {
   }
 
   try {
+    // 保存赠送前的好感度
+    const oldAffinity = companionState.value?.affinity_score || 0
+
     const response = await romanceApi.giveGift(props.companionId, {
       gift_type: gift.item_id,
       gift_name: gift.name,
@@ -268,7 +476,17 @@ const selectGift = async (gift: StoreItemResponse) => {
     })
 
     if (response.success) {
-      alert(`${response.companion_reaction}\n\n好感度 +${response.affinity_change}`)
+      // 显示礼物反馈动画
+      giftFeedback.value = {
+        visible: true,
+        giftEmoji: gift.emoji || '🎁',
+        giftName: gift.name,
+        companionReaction: response.companion_reaction,
+        affinityChange: response.affinity_change,
+        oldAffinity: oldAffinity,
+        newAffinity: response.new_affinity_score
+      }
+
       // 刷新状态和礼物列表
       await Promise.all([
         loadCompanionState(),
@@ -280,6 +498,89 @@ const selectGift = async (gift: StoreItemResponse) => {
     const errorMsg = error.response?.data?.detail || '赠送失败，请稍后重试'
     alert(errorMsg)
   }
+}
+
+const closeFeedback = () => {
+  giftFeedback.value.visible = false
+}
+
+const closeLevelUpCard = () => {
+  levelUpCard.value.visible = false
+}
+
+const closeTaskFeedback = () => {
+  taskFeedback.value.visible = false
+}
+
+const closeTaskNotification = () => {
+  taskNotification.value.visible = false
+}
+
+const scrollToTasks = () => {
+  // 滚动到任务区域
+  const tasksSection = document.querySelector('.daily-tasks')
+  if (tasksSection) {
+    tasksSection.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+}
+
+const getTaskTimeRemaining = (task: DailyTaskResponse): string => {
+  const now = new Date()
+  const deadline = new Date(task.deadline)
+  const hoursRemaining = (deadline.getTime() - now.getTime()) / (1000 * 60 * 60)
+
+  if (hoursRemaining < 0) return '已过期'
+  if (hoursRemaining < 1) return `${Math.round(hoursRemaining * 60)}分钟内过期`
+  if (hoursRemaining < 6) return `${Math.round(hoursRemaining)}小时内过期`
+  return ''
+}
+
+const isTaskUrgentCheck = (task: DailyTaskResponse): boolean => {
+  const now = new Date()
+  const deadline = new Date(task.deadline)
+  const hoursRemaining = (deadline.getTime() - now.getTime()) / (1000 * 60 * 60)
+  return hoursRemaining > 0 && hoursRemaining < 6
+}
+
+const completeTask = async (task: DailyTaskResponse) => {
+  // 检查任务是否已完成
+  if (task.completed) {
+    return
+  }
+
+  try {
+    const response = await romanceApi.completeTask(props.companionId, task.task_id, props.userId)
+
+    if (response.success) {
+      // 显示任务完成反馈
+      taskFeedback.value = {
+        visible: true,
+        taskIcon: getTaskIconEmoji(task.task_type),
+        taskDescription: task.description,
+        reward: response.reward
+      }
+
+      // 刷新状态和任务列表
+      await Promise.all([
+        loadCompanionState(),
+        loadDailyTasks()
+      ])
+    }
+  } catch (error: any) {
+    console.error('完成任务失败:', error)
+    const errorMsg = error.response?.data?.detail || '任务完成失败，请稍后重试'
+    alert(errorMsg)
+  }
+}
+
+const getTaskIconEmoji = (taskType: string): string => {
+  const emojiMap: Record<string, string> = {
+    'chat': '💬',
+    'compliment': '💖',
+    'romantic': '💕',
+    'gift': '🎁'
+  }
+  return emojiMap[taskType] || '⭐'
 }
 
 const getRarityText = (rarity: string): string => {
@@ -321,16 +622,48 @@ const formatMemoryTime = (timestamp: number): string => {
   const date = new Date(timestamp * 1000)
   const now = new Date()
   const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24))
-  
+
   if (diffDays === 0) return '今天'
   if (diffDays === 1) return '昨天'
   if (diffDays < 7) return `${diffDays}天前`
   return date.toLocaleDateString()
 }
 
+const getDifficultyConfig = (difficulty: string) => {
+  const configs = {
+    'easy': { name: '简单', color: '#10b981', icon: '⭐' },
+    'medium': { name: '中等', color: '#3b82f6', icon: '⭐⭐' },
+    'hard': { name: '困难', color: '#f59e0b', icon: '⭐⭐⭐' },
+    'challenge': { name: '挑战', color: '#ef4444', icon: '⭐⭐⭐⭐' }
+  }
+  return configs[difficulty] || configs['easy']
+}
+
+const hasProgress = (task: DailyTaskResponse): boolean => {
+  return task.max_progress > 1
+}
+
+const getRewardText = (task: DailyTaskResponse): string => {
+  const rewards = []
+  if (task.reward_affinity) {
+    rewards.push(`+${task.reward_affinity} 好感度`)
+  }
+  if (task.reward_coins) {
+    rewards.push(`+${task.reward_coins} 金币`)
+  }
+  return rewards.join(' | ')
+}
+
 // 生命周期
 onMounted(async () => {
   console.log('[RomancePanel] 组件挂载, props:', props)
+
+  // 从localStorage恢复上次检查日期
+  const savedDate = localStorage.getItem(`lastTaskCheck_${props.companionId}_${props.userId}`)
+  if (savedDate) {
+    lastTaskCheckDate.value = savedDate
+  }
+
   await Promise.all([
     loadCompanionState(),
     loadDailyTasks(),
@@ -485,13 +818,117 @@ setInterval(() => {
   font-size: 1.125rem;
 }
 
+.tasks-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-left h4 {
+  margin: 0;
+}
+
+.completion-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 8px 16px;
+  border-radius: 20px;
+}
+
+.completion-text {
+  font-size: 0.75rem;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.completion-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #6b7280;
+}
+
+.completion-value.medium {
+  color: #f59e0b;
+}
+
+.completion-value.high {
+  color: #10b981;
+}
+
+.urgent-reminder {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  padding: 12px 16px;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  border: 1px solid #fbbf24;
+  animation: urgentPulse 2s ease-in-out infinite;
+}
+
+@keyframes urgentPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 rgba(251, 191, 36, 0);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(251, 191, 36, 0.5);
+  }
+}
+
+.urgent-reminder i {
+  color: #d97706;
+  font-size: 1.125rem;
+}
+
+.urgent-reminder span {
+  color: #92400e;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
 .task-list, .event-list, .memories-list {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-.task-item, .event-item {
+.task-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  transition: all 0.2s ease;
+}
+
+.task-item.clickable {
+  cursor: pointer;
+}
+
+.task-item.clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(107, 70, 193, 0.2);
+  border-color: #a78bfa;
+}
+
+.task-item:hover, .event-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(107, 70, 193, 0.2);
+}
+
+.event-item {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -503,14 +940,106 @@ setInterval(() => {
   transition: all 0.2s ease;
 }
 
-.task-item:hover, .event-item:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(107, 70, 193, 0.2);
-}
-
 .task-item.completed {
   opacity: 0.6;
   background: #f0fdf4;
+  cursor: not-allowed;
+}
+
+.task-item.completed:hover {
+  transform: none;
+  box-shadow: none;
+  border-color: rgba(255, 255, 255, 0.9);
+}
+
+.task-item.highlighted:not(.completed) {
+  background: linear-gradient(135deg, rgba(167, 139, 250, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+  border-color: #a78bfa;
+}
+
+.task-item.urgent:not(.completed) {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.15) 0%, rgba(245, 158, 11, 0.15) 100%);
+  border-color: #f59e0b;
+  animation: urgentShake 3s ease-in-out infinite;
+}
+
+@keyframes urgentShake {
+  0%, 98%, 100% {
+    transform: translateX(0);
+  }
+  99%, 99.5% {
+    transform: translateX(-2px);
+  }
+  99.25%, 99.75% {
+    transform: translateX(2px);
+  }
+}
+
+.task-content {
+  flex: 1;
+}
+
+.task-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.task-description {
+  flex: 1;
+  font-size: 0.9375rem;
+  color: #374151;
+  font-weight: 500;
+}
+
+.task-difficulty {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.difficulty-icon {
+  font-size: 0.65rem;
+}
+
+.difficulty-text {
+  font-size: 0.7rem;
+}
+
+.task-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.task-reward {
+  font-size: 0.75rem;
+  color: #10b981;
+  font-weight: 600;
+}
+
+.task-deadline {
+  font-size: 0.75rem;
+  color: #f59e0b;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.task-deadline::before {
+  content: '⏰';
+}
+
+.task-uncompleted {
+  color: #d1d5db;
+  font-size: 0.875rem;
 }
 
 .gift-grid {

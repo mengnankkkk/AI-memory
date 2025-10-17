@@ -15,6 +15,7 @@ from app.api.schemas_romance import (
 from app.services.redis_utils import (
     redis_affinity_manager, redis_event_manager, redis_stats_manager
 )
+from app.services.task_manager import task_manager
 from app.core.gift_config import get_all_gifts, get_gift_by_id
 from typing import List, Optional
 import logging
@@ -132,6 +133,18 @@ async def give_gift(
         # 记录统计
         await redis_stats_manager.increment_counter("gifts_given")
         await redis_stats_manager.increment_counter(f"gift_type_{gift_request.gift_type}")
+
+        # 自动完成礼物任务
+        auto_complete_result = await task_manager.check_and_complete_task_automatically(
+            gift_request.user_id, companion_id, "gift"
+        )
+        if auto_complete_result:
+            logger.info(f"[GiftSystem] 自动完成礼物任务，奖励: {auto_complete_result['reward']}")
+            # 更新好感度
+            await redis_affinity_manager.update_affinity(
+                gift_request.user_id, companion_id,
+                auto_complete_result['reward'], 0, 0, "task"
+            )
 
         logger.info(f"[GiftSystem] {gift_request.user_id} 赠送 {gift_config['name']} 给 {companion.name}，库存剩余: {inventory.quantity}")
 
@@ -276,7 +289,40 @@ async def analyze_interaction(
         # 记录统计
         await redis_stats_manager.increment_counter("interactions_analyzed")
         await redis_stats_manager.increment_counter(f"sentiment_{analysis['sentiment']}")
-        
+
+        # 自动检测并完成任务
+        auto_complete_tasks = []
+
+        # 检测聊天任务（每次对话都计数）
+        chat_result = await task_manager.check_and_complete_task_automatically(
+            analysis_request.user_id, companion_id, "chat"
+        )
+        if chat_result:
+            auto_complete_tasks.append(("chat", chat_result))
+
+        # 检测赞美任务
+        if analysis["sentiment"] == "positive":
+            compliment_result = await task_manager.check_and_complete_task_automatically(
+                analysis_request.user_id, companion_id, "compliment", analysis_request.message
+            )
+            if compliment_result:
+                auto_complete_tasks.append(("compliment", compliment_result))
+
+        # 检测浪漫任务
+        romantic_result = await task_manager.check_and_complete_task_automatically(
+            analysis_request.user_id, companion_id, "romantic", analysis_request.message
+        )
+        if romantic_result:
+            auto_complete_tasks.append(("romantic", romantic_result))
+
+        # 为所有自动完成的任务更新好感度
+        for task_type, result in auto_complete_tasks:
+            logger.info(f"[InteractionAnalysis] 自动完成{task_type}任务，奖励: {result['reward']}")
+            await redis_affinity_manager.update_affinity(
+                analysis_request.user_id, companion_id,
+                result['reward'], 0, 0, "task"
+            )
+
         return InteractionAnalysisResponse(**analysis)
     
     except HTTPException:
@@ -309,16 +355,78 @@ async def get_daily_tasks(
         # 获取伙伴状态以确定任务难度（使用英文键名）
         state = await redis_affinity_manager.get_companion_state(user_id, companion_id)
         romance_level = state.get("romance_level", "stranger") if state else "stranger"
-        
-        # 生成每日任务
-        tasks = _generate_daily_tasks(romance_level, companion.personality_archetype)
-        
+
+        # 使用TaskManager生成每日任务
+        tasks = await task_manager.generate_daily_tasks(
+            user_id, companion_id, romance_level, companion.personality_archetype
+        )
+
         return tasks
-    
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"[get_daily_tasks] {e}")
+        raise HTTPException(status_code=500, detail="服务器内部错误")
+
+
+@router.post("/companion/{companion_id}/tasks/{task_id}/complete")
+async def complete_task(
+    companion_id: int,
+    task_id: str,
+    user_id: str = Query(..., description="用户ID"),
+    db: AsyncSession = Depends(get_db)
+):
+    """完成每日任务"""
+    try:
+        # 验证伙伴是否存在
+        stmt = select(Companion).where(Companion.id == companion_id)
+        result = await db.execute(stmt)
+        companion = result.scalar_one_or_none()
+
+        if not companion:
+            raise HTTPException(status_code=404, detail="伙伴不存在")
+
+        # 系统伙伴（user_id=1）对所有用户可见，用户自建伙伴只对创建者可见
+        if companion.user_id != 1 and companion.user_id != int(user_id):
+            raise HTTPException(status_code=403, detail="无权访问此伙伴")
+
+        # 完成任务
+        task_result = await task_manager.complete_task(user_id, companion_id, task_id)
+
+        if not task_result["success"]:
+            return task_result
+
+        # 获取奖励好感度
+        reward = task_result["reward"]
+
+        # 更新好感度
+        await redis_affinity_manager.update_affinity(
+            user_id,
+            companion_id,
+            reward,  # affinity_change
+            0,       # trust_change
+            0,       # tension_change
+            "task"   # interaction_type
+        )
+
+        # 记录统计
+        await redis_stats_manager.increment_counter("tasks_completed")
+        await redis_stats_manager.increment_counter(f"task_type_{task_id.split('_')[1]}")
+
+        logger.info(f"[TaskSystem] {user_id} 完成任务 {task_id}，获得 {reward} 好感度")
+
+        return {
+            "success": True,
+            "message": task_result["message"],
+            "reward": reward,
+            "task_id": task_id
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[complete_task] {e}")
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
 

@@ -70,8 +70,8 @@ class RomanceApi {
   /**
    * 完成每日任务
    */
-  async completeTask(taskId: string, companionId: number, userId: string): Promise<{ success: boolean; reward: number }> {
-    const { data } = await api.post(`${API_BASE}/companion/${companionId}/tasks/${taskId}/complete`, { user_id: userId })
+  async completeTask(companionId: number, taskId: string, userId: string): Promise<{ success: boolean; message: string; reward: number; task_id: string }> {
+    const { data } = await api.post(`${API_BASE}/companion/${companionId}/tasks/${taskId}/complete?user_id=${userId}`)
     return data
   }
 
@@ -81,7 +81,8 @@ class RomanceApi {
   async getStoreItems(userId: string, itemType?: string, rarity?: string): Promise<StoreItemResponse[]> {
     const params = new URLSearchParams()
     params.append('user_id', userId)
-    if (itemType) params.append('item_type', itemType)
+    // 只有当itemType不是泛型'gift'时才添加过滤条件
+    if (itemType && itemType !== 'gift') params.append('item_type', itemType)
     if (rarity) params.append('rarity', rarity)
 
     const url = `${API_BASE}/store/items?${params.toString()}`
