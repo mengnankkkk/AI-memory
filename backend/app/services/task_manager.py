@@ -7,6 +7,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 from app.core.redis_client import get_redis
+from app.services.redis_utils import redis_affinity_manager
 
 logger = logging.getLogger("task_manager")
 
@@ -116,7 +117,7 @@ class TaskManager:
         base_tasks = []
 
         # 聊天任务（有进度）
-        chat_task_id = f"daily_chat_{today}"
+        chat_task_id = f"daily_chat_{companion_id}_{today}"
         chat_progress = await self.get_task_progress(user_id, companion_id, chat_task_id)
         base_tasks.append({
             "task_id": chat_task_id,
@@ -133,7 +134,7 @@ class TaskManager:
         })
 
         # 赞美任务
-        compliment_task_id = f"daily_compliment_{today}"
+        compliment_task_id = f"daily_compliment_{companion_id}_{today}"
         base_tasks.append({
             "task_id": compliment_task_id,
             "task_type": "compliment",
@@ -150,7 +151,7 @@ class TaskManager:
 
         # 早安问候任务（仅早上6-12点显示）
         if 6 <= current_hour < 12:
-            morning_task_id = f"daily_morning_{today}"
+            morning_task_id = f"daily_morning_{companion_id}_{today}"
             base_tasks.append({
                 "task_id": morning_task_id,
                 "task_type": "morning_greeting",
@@ -167,7 +168,7 @@ class TaskManager:
 
         # 晚安问候任务（仅晚上18-24点显示）
         if current_hour >= 18:
-            night_task_id = f"daily_night_{today}"
+            night_task_id = f"daily_night_{companion_id}_{today}"
             base_tasks.append({
                 "task_id": night_task_id,
                 "task_type": "night_greeting",
@@ -184,7 +185,7 @@ class TaskManager:
 
         # 根据关系阶段添加特殊任务
         if romance_level in ["romantic", "lover"]:
-            romantic_task_id = f"daily_romantic_{today}"
+            romantic_task_id = f"daily_romantic_{companion_id}_{today}"
             base_tasks.append({
                 "task_id": romantic_task_id,
                 "task_type": "romantic",
@@ -200,7 +201,7 @@ class TaskManager:
             })
 
         # 连续互动任务（挑战级）
-        consecutive_task_id = f"weekly_consecutive_{datetime.now().strftime('%Y%W')}"
+        consecutive_task_id = f"weekly_consecutive_{companion_id}_{datetime.now().strftime('%Y%W')}"
         consecutive_progress = await self.get_consecutive_days(user_id, companion_id)
         base_tasks.append({
             "task_id": consecutive_task_id,
@@ -426,6 +427,14 @@ class TaskManager:
             key = self._get_task_completion_key(user_id, companion_id, task_id)
             await redis.setex(key, self.task_expiry, "1")
 
+            # 更新Redis好感度（用于自动完成任务的奖励）
+            await redis_affinity_manager.update_affinity(
+                user_id=user_id,
+                companion_id=companion_id,
+                affinity_change=reward,
+                interaction_type="task"
+            )
+
             logger.info(f"[TaskManager] 用户 {user_id} 完成任务 {task_id}，获得 {reward} 好感度")
 
             return {
@@ -460,7 +469,14 @@ class TaskManager:
             return 8
         elif "romantic" in task_id:
             return 15
+        elif "morning" in task_id or "morning_greeting" in task_id:
+            return 3
+        elif "night" in task_id or "night_greeting" in task_id:
+            return 3
+        elif "gift" in task_id:
+            return 10
         else:
+            logger.warning(f"[TaskManager] 未知的任务ID类型: {task_id}")
             return 0
 
     def _get_interaction_counter_key(self, user_id: str, companion_id: int, interaction_type: str) -> str:
@@ -543,21 +559,30 @@ class TaskManager:
         """
         try:
             today = datetime.now().strftime('%Y%m%d')
-            task_id = f"daily_{interaction_type}_{today}"
+            task_id = f"daily_{interaction_type}_{companion_id}_{today}"
 
             # 特殊处理：早安和晚安任务
             if interaction_type in ["morning_greeting", "night_greeting"]:
                 # 检测消息中是否包含早安/晚安
                 if interaction_type == "morning_greeting" and message_content:
                     if not any(keyword in message_content for keyword in ["早安", "早上好", "早", "Good morning"]):
+                        logger.debug(f"[TaskManager] 消息不包含早安关键词: {message_content}")
                         return None
                 elif interaction_type == "night_greeting" and message_content:
-                    if not any(keyword in message_content for keyword in ["晚安", "晚上好", "Good night"]):
+                    keywords = ["晚安", "晚上好", "Good night"]
+                    has_keyword = any(keyword in message_content for keyword in keywords)
+                    logger.info(f"[TaskManager] 检测晚安关键词: message='{message_content}', has_keyword={has_keyword}")
+                    if not has_keyword:
+                        logger.debug(f"[TaskManager] 消息不包含晚安关键词")
                         return None
 
             # 检查任务是否已完成
-            if await self.is_task_completed(user_id, companion_id, task_id):
+            is_completed = await self.is_task_completed(user_id, companion_id, task_id)
+            if is_completed:
+                logger.debug(f"[TaskManager] 任务已完成，跳过: task_id={task_id}")
                 return None
+            else:
+                logger.info(f"[TaskManager] 任务未完成，准备自动完成: task_id={task_id}, interaction_type={interaction_type}")
 
             # 更新连续互动天数（仅聊天类任务）
             if interaction_type == "chat":

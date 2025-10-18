@@ -40,6 +40,9 @@ class CoordinatedResponse:
     # 元数据
     debug_info: Dict  # 调试信息
 
+    # 任务完成信息
+    completed_tasks: List[Dict] = None  # 自动完成的任务列表
+
 
 class ResponseCoordinator:
     """
@@ -245,7 +248,7 @@ class ResponseCoordinator:
 
             # 4.2 任务自动完成检测
             self.logger.info("\n🎯 阶段4.2: 任务自动完成检测")
-            await self._check_and_complete_tasks(
+            completed_tasks = await self._check_and_complete_tasks(
                 user_id=user_id,
                 companion_id=companion_id,
                 user_message=user_message,
@@ -259,7 +262,8 @@ class ResponseCoordinator:
                 process_result=process_result,
                 emotion_expression=emotion_expression,
                 system_prompt=system_prompt if debug_mode else "[隐藏]",
-                debug_info=debug_info if debug_mode else {}
+                debug_info=debug_info if debug_mode else {},
+                completed_tasks=completed_tasks if completed_tasks else None
             )
 
             self.logger.info(
@@ -344,7 +348,7 @@ class ResponseCoordinator:
         companion_id: int,
         user_message: str,
         emotion_analysis: EmotionAnalysis
-    ):
+    ) -> List[Dict]:
         """
         检查并自动完成任务
 
@@ -353,7 +357,11 @@ class ResponseCoordinator:
             companion_id: 伙伴ID
             user_message: 用户消息内容
             emotion_analysis: 情感分析结果
+
+        Returns:
+            完成的任务列表
         """
+        completed_tasks = []  # 存储完成的任务
         try:
             total_task_rewards = 0  # 累计任务奖励
 
@@ -367,6 +375,11 @@ class ResponseCoordinator:
             if chat_result and chat_result.get("success"):
                 reward = chat_result.get('reward', 0)
                 total_task_rewards += reward
+                completed_tasks.append({
+                    "task_type": "chat",
+                    "task_id": chat_result.get('task_id'),
+                    "reward": reward
+                })
                 self.logger.info(f"✅ 自动完成聊天任务，奖励: +{reward} 好感度")
             elif chat_result and chat_result.get("milestone_rewards"):
                 for milestone in chat_result["milestone_rewards"]:
@@ -385,6 +398,11 @@ class ResponseCoordinator:
                 if compliment_result and compliment_result.get("success"):
                     reward = compliment_result.get('reward', 0)
                     total_task_rewards += reward
+                    completed_tasks.append({
+                        "task_type": "compliment",
+                        "task_id": compliment_result.get('task_id'),
+                        "reward": reward
+                    })
                     self.logger.info(f"✅ 自动完成赞美任务，奖励: +{reward} 好感度")
 
             # 3. 浪漫任务 - 检测浪漫关键词
@@ -397,6 +415,11 @@ class ResponseCoordinator:
             if romantic_result and romantic_result.get("success"):
                 reward = romantic_result.get('reward', 0)
                 total_task_rewards += reward
+                completed_tasks.append({
+                    "task_type": "romantic",
+                    "task_id": romantic_result.get('task_id'),
+                    "reward": reward
+                })
                 self.logger.info(f"✅ 自动完成浪漫任务，奖励: +{reward} 好感度")
 
             # 4. 早安任务 - 检测早安关键词
@@ -409,6 +432,11 @@ class ResponseCoordinator:
             if morning_result and morning_result.get("success"):
                 reward = morning_result.get('reward', 0)
                 total_task_rewards += reward
+                completed_tasks.append({
+                    "task_type": "morning_greeting",
+                    "task_id": morning_result.get('task_id'),
+                    "reward": reward
+                })
                 self.logger.info(f"✅ 自动完成早安任务，奖励: +{reward} 好感度")
 
             # 5. 晚安任务 - 检测晚安关键词
@@ -421,27 +449,21 @@ class ResponseCoordinator:
             if night_result and night_result.get("success"):
                 reward = night_result.get('reward', 0)
                 total_task_rewards += reward
+                completed_tasks.append({
+                    "task_type": "night_greeting",
+                    "task_id": night_result.get('task_id'),
+                    "reward": reward
+                })
                 self.logger.info(f"✅ 自动完成晚安任务，奖励: +{reward} 好感度")
 
-            # 如果有任务奖励，更新数据库中的好感度
+            # 任务奖励会在complete_task的API层自动更新好感度
             if total_task_rewards > 0:
-                self.logger.info(f"🎁 任务奖励总计: +{total_task_rewards} 好感度，正在更新数据库...")
-                try:
-                    # 使用 affinity_engine 更新数据库
-                    await affinity_engine.update_database(
-                        user_id=user_id,
-                        companion_id=companion_id,
-                        affinity_change=total_task_rewards,
-                        trust_change=0,
-                        tension_change=0,
-                        interaction_type="task"
-                    )
-                    self.logger.info(f"✅ 任务奖励已更新到数据库")
-                except Exception as e:
-                    self.logger.warning(f"⚠️ 任务奖励更新数据库失败: {e}")
+                self.logger.info(f"🎁 任务奖励总计: +{total_task_rewards} 好感度")
 
         except Exception as e:
             self.logger.warning(f"⚠️ 任务检测失败: {e}")
+
+        return completed_tasks
 
     def _build_working_memory(
         self,

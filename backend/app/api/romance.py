@@ -391,7 +391,7 @@ async def complete_task(
         if companion.user_id != 1 and companion.user_id != int(user_id):
             raise HTTPException(status_code=403, detail="无权访问此伙伴")
 
-        # 完成任务
+        # 完成任务（task_manager.complete_task 会自动更新好感度）
         task_result = await task_manager.complete_task(user_id, companion_id, task_id)
 
         if not task_result["success"]:
@@ -399,16 +399,6 @@ async def complete_task(
 
         # 获取奖励好感度
         reward = task_result["reward"]
-
-        # 更新好感度
-        await redis_affinity_manager.update_affinity(
-            user_id,
-            companion_id,
-            reward,  # affinity_change
-            0,       # trust_change
-            0,       # tension_change
-            "task"   # interaction_type
-        )
 
         # 记录统计
         await redis_stats_manager.increment_counter("tasks_completed")

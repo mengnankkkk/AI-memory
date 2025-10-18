@@ -31,6 +31,7 @@ const {
   onResponseEnd,
   onError,
   onChatJoined,
+  onTasksCompleted,
   removeAllListeners
 } = useWebSocketChat()
 
@@ -49,6 +50,7 @@ const romanceLevel = ref<string>('')
 const showAffinityChange = ref(false)
 const affinityDelta = ref(0)
 let affinityTimeout: ReturnType<typeof setTimeout> | null = null
+const romancePanelRef = ref<any>(null) // RomancePanel组件引用
 
 // 事件系统相关状态
 const pendingEvents = ref<EventData[]>([])
@@ -284,7 +286,7 @@ const initWebSocket = () => {
     const lastMessage = messages.value[messages.value.length - 1]
     if (lastMessage && lastMessage.role === 'assistant') {
       lastMessage.content = fullContent
-      
+
       // 保存消息到用户store
       userStore.addChatMessage({
         id: Date.now(),
@@ -296,7 +298,19 @@ const initWebSocket = () => {
     isLoading.value = false
     await refreshAffinityState()
   })
-  
+
+  // 监听任务完成
+  onTasksCompleted(async (data) => {
+    console.log('✅ 任务完成通知:', data)
+    // 刷新好感度状态
+    await refreshAffinityState()
+    // 刷新RomancePanel中的任务列表
+    if (romancePanelRef.value && romancePanelRef.value.loadDailyTasks) {
+      await romancePanelRef.value.loadDailyTasks()
+      console.log('🔄 已刷新任务列表')
+    }
+  })
+
   // 监听错误
   onError((error) => {
     console.error('❌ 聊天错误:', error)
@@ -618,6 +632,7 @@ onBeforeUnmount(() => {
       
       <div class="p-4">
         <RomancePanel
+          ref="romancePanelRef"
           :companion-id="companionId"
           :companion-name="companion.name"
           :user-id="userStore.userId || 'default'"

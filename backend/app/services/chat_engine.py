@@ -32,6 +32,7 @@ class ChatEngine:
     
     def __init__(self):
         self.active_sessions: Dict[str, Dict] = {}
+        self.last_completed_tasks: Dict[str, List[Dict]] = {}  # 存储最近完成的任务 {sid: [tasks]}
     
     async def create_session(self, session_id: str, companion_id: int, user_id: str, chat_session_id: Optional[int] = None):
         """创建聊天会话"""
@@ -297,6 +298,10 @@ class ChatEngine:
 
             assistant_response = coordinated_response.ai_response or ""
 
+            # 保存任务完成信息到实例变量
+            if coordinated_response.completed_tasks:
+                self.last_completed_tasks[session_id] = coordinated_response.completed_tasks
+
             # 记录 Prompt 版本使用埋点
             await analytics_service.track_prompt_usage(
                 str(session['user_id']),
@@ -331,8 +336,16 @@ class ChatEngine:
             await redis_stats_manager.increment_counter("error_responses")
             yield "抱歉，我现在遇到了一些技术问题，请稍后再试。😅"
 
-    async def process_message_by_db_session(self, db_session_id: int, user_id: int, companion_id: int, user_message: str) -> AsyncIterator[str]:
-        """基于数据库会话ID处理用户消息"""
+    async def process_message_by_db_session(self, db_session_id: int, user_id: int, companion_id: int, user_message: str, sid: Optional[str] = None) -> AsyncIterator[str]:
+        """基于数据库会话ID处理用户消息
+
+        Args:
+            db_session_id: 数据库会话ID
+            user_id: 用户ID
+            companion_id: 伙伴ID
+            user_message: 用户消息
+            sid: Socket.IO session ID (可选，用于保存任务完成信息)
+        """
         try:
             # 内容安全检查
             is_safe, filter_reason = await content_filter.is_content_safe(user_message)
@@ -392,6 +405,11 @@ class ChatEngine:
             )
 
             assistant_response = coordinated_response.ai_response or ""
+
+            # 保存任务完成信息到实例变量
+            if sid and coordinated_response.completed_tasks:
+                self.last_completed_tasks[sid] = coordinated_response.completed_tasks
+                logger.info(f"[TaskEngine] 保存任务完成信息到sid={sid}: {len(coordinated_response.completed_tasks)} 个任务")
 
             # 记录 Prompt 版本使用埋点
             await analytics_service.track_prompt_usage(
@@ -568,10 +586,11 @@ def register_socketio_events(sio_instance):
                 
                 # 使用基于数据库session_id的处理方法
                 async for chunk in chat_engine.process_message_by_db_session(
-                    session_id, 
-                    session['user_id'], 
-                    session['companion_id'], 
-                    user_message
+                    session_id,
+                    session['user_id'],
+                    session['companion_id'],
+                    user_message,
+                    sid  # 传递Socket.IO session ID用于保存任务信息
                 ):
                     await sio_instance.emit('response_chunk', {'chunk': chunk}, room=sid)
                     await asyncio.sleep(0.05)  # 稍微增加延迟，让流式效果更明显
@@ -582,7 +601,21 @@ def register_socketio_events(sio_instance):
                     await asyncio.sleep(0.05)  # 稍微增加延迟，让流式效果更明显
             
             await sio_instance.emit('response_end', {}, room=sid)
-                
+
+            # 检查是否有任务完成，如果有则发送通知
+            if sid in chat_engine.last_completed_tasks:
+                completed_tasks = chat_engine.last_completed_tasks.pop(sid)  # 取出并清除
+                logger.info(f"[TaskNotify] 发送任务完成通知: {len(completed_tasks)} 个任务")
+
+                # 获取用户ID和伙伴ID
+                session = chat_engine.active_sessions.get(sid)
+                if session:
+                    await sio_instance.emit('tasks_completed', {
+                        'completed_tasks': completed_tasks,
+                        'user_id': str(session['user_id']),
+                        'companion_id': session['companion_id']
+                    }, room=sid)
+
         except Exception as e:
             logger.error(f"发送消息失败: {e}")
             await sio_instance.emit('error', {'message': '消息发送失败'}, room=sid)

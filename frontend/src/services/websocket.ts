@@ -163,20 +163,28 @@ export const useWebSocketChat = () => {
   // 监听聊天加入成功
   const onChatJoined = (callback: (data: any) => void) => {
     if (!socket.value) return
-    
+
     socket.value.on('chat_joined', callback)
   }
-  
+
+  // 监听任务完成
+  const onTasksCompleted = (callback: (data: { completed_tasks: Array<{ task_type: string; task_id: string; reward: number }>; user_id: string; companion_id: number }) => void) => {
+    if (!socket.value) return
+
+    socket.value.on('tasks_completed', callback)
+  }
+
   // 移除所有监听器
   const removeAllListeners = () => {
     if (!socket.value) return
-    
+
     socket.value.removeAllListeners('message_received')
     socket.value.removeAllListeners('response_start')
     socket.value.removeAllListeners('response_chunk')
     socket.value.removeAllListeners('response_end')
     socket.value.removeAllListeners('error')
     socket.value.removeAllListeners('chat_joined')
+    socket.value.removeAllListeners('tasks_completed')
   }
   
   // 设置自动加入回调
@@ -189,14 +197,14 @@ export const useWebSocketChat = () => {
     isConnected: computed(() => isConnected.value),
     isConnecting: computed(() => isConnecting.value),
     currentStreamingMessage: computed(() => currentStreamingMessage.value),
-    
+
     // 方法
     connect,
     disconnect,
     joinChat,
     sendMessage,
     setAutoJoinCallback,
-    
+
     // 事件监听
     onMessageReceived,
     onResponseStart,
@@ -204,6 +212,7 @@ export const useWebSocketChat = () => {
     onResponseEnd,
     onError,
     onChatJoined,
+    onTasksCompleted,
     removeAllListeners
   }
 }
