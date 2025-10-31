@@ -1,52 +1,155 @@
-# AI灵魂伙伴 (Project Listener) 💖
+# AI灵魂伙伴 (AI Companion System) 💖
 
-> 多模型支持的AI虚拟伴侣系统 - 让每一次对话都充满温暖与理解
+> 下一代AI虚拟伴侣系统 - 基于情感计算引擎的智能对话体验
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109.0-009688?logo=fastapi)](https://fastapi.tiangolo.com/)
 [![Vue 3](https://img.shields.io/badge/Vue-3.4-4FC08D?logo=vue.js)](https://vuejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3-3178C6?logo=typescript)](https://www.typescriptlang.org/)
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python)](https://www.python.org/)
+[![Redis](https://img.shields.io/badge/Redis-6.0+-DC382D?logo=redis)](https://redis.io/)
 
 ## 🎯 项目简介
 
-一个轻量级AI虚拟伴侣MVP,专注于打造高质量的情感对话体验。用户可以创建拥有独特性格的AI伙伴,随时进行温暖、真诚的交流。
+一个功能完整的AI虚拟伴侣系统，采用先进的情感计算引擎，支持多LLM提供商，提供真实、有温度的情感交互体验。系统实现了7级好感度分级、智能记忆系统、恋爱攻略机制和动态事件触发，让每一次对话都充满个性与情感。
 
-### ✨ 核心特性
+## ✨ 核心特性
 
-- 🎭 **3种性格原型**: 温柔倾听者 | 元气鼓励者 | 理性分析者
-- 💬 **实时对话**: 流畅的即时通讯体验
-- 🧠 **会话记忆**: 智能上下文管理
-- 🎨 **精美UI**: 基于TailwindCSS的现代化界面
-- 🚀 **快速部署**: 简单易用的开发环境
+### 🧠 智能情感引擎
+- **AI级情感分析** - 使用LLM深度理解用户情感、意图和上下文
+- **7级好感度系统** - 陌生 → 认识 → 朋友 → 好友 → 特别的人 → 心动 → 恋人
+- **动态回复风格** - 根据关系等级自动调整称呼、语气和亲密度
+- **情感保护机制** - 智能边界保护，防止好感度异常跳跃
+- **反讽识别能力** - 能区分"你这个笨蛋~"(亲昵) vs "你是个笨蛋"(侮辱)
+
+### 🎭 多性格系统
+- **💖 温柔的倾听者** - 同理心强、语言温暖，适合倾诉烦恼
+- **✨ 元气的鼓励者** - 积极向上、充满活力，适合需要打气
+- **🧠 理性的分析者** - 逻辑清晰、结构化思考，适合解决问题
+
+### 🎮 恋爱攻略系统
+- **礼物赠送** - 多种礼物类型，触发特殊反应
+- **每日任务** - 引导用户进行有意义的互动
+- **随机事件** - 咖啡馆偶遇、深夜交心、意外礼物等
+- **主线事件** - 破冰时刻、友谊确认、心动时刻、表白时刻
+- **珍贵回忆** - 自动记录重要时刻
+
+### 🧠 三层记忆系统
+- **L1 工作记忆** - 当前会话的短期上下文
+- **L2 情景记忆** - 重要对话片段的长期存储（支持向量数据库）
+- **L3 语义记忆** - 用户事实信息（昵称、喜好、职业等）
+
+### 🤖 多LLM支持
+| 提供商 | 模型 | 特点 | 状态 |
+|--------|------|------|------|
+| **Gemini** ✨ | gemini-2.0-flash-exp | 最新、最强、响应快 | **推荐** |
+| **Tencent Hunyuan** | hunyuan-lite/standard/pro | 国内访问稳定 | 支持 |
+| **DeepSeek** | DeepSeek V3.1 | 开源、Gradio接入 | 支持 |
+| **Mock** | 本地模拟 | 快速测试 | 开发用 |
+
+### 💬 实时通信
+- **WebSocket支持** - Socket.IO实现的双向实时通信
+- **流式输出** - 支持LLM流式回复，打字机效果
+- **会话管理** - 多会话支持，历史记录保存
+
+### 📊 完整功能
+- ✅ 用户认证系统
+- ✅ 实时聊天 + 流式输出
+- ✅ 好感度追踪与可视化
+- ✅ 事件系统（主线+随机）
+- ✅ 礼物与任务系统
+- ✅ 数据导出（对话记录、统计信息）
+- ✅ 离线生活模拟（时间线调度器）
+- ✅ Redis缓存（状态、会话）
+- ✅ 统计分析面板
+- ✅ A/B测试支持
+- ✅ 通知系统
 
 ## 🏗️ 技术架构
 
 ```
-┌─────────────────────────────────┐
-│      Vue 3 + TypeScript         │  前端
-│      TailwindCSS + Vite         │
-└───────────┬─────────────────────┘
-            │ HTTP/Axios
-┌───────────▼─────────────────────┐
-│         FastAPI                 │  后端
-│    + SQLAlchemy (SQLite)        │
-└───────────┬─────────────────────┘
-            │
-┌───────────▼─────────────────────┐
-│      🤖 多LLM支持                │  LLM
-│   ✨ Google Gemini 2.0 Flash     │  (推荐)
-│   🔷 DeepSeek V3.1 (Gradio)     │
-│   🎭 Mock模式                    │
-└─────────────────────────────────┘
+┌─────────────────────────────────────────┐
+│   Frontend - Vue 3 + TypeScript         │
+│   UI: TailwindCSS + Vite                │
+│   State: Pinia                          │
+│   Socket: socket.io-client              │
+└───────────────┬─────────────────────────┘
+                │ HTTP/WebSocket
+┌───────────────▼─────────────────────────┐
+│   Backend - FastAPI + SQLAlchemy        │
+│   Database: SQLite                      │
+│   Cache: Redis                          │
+│   Realtime: Socket.IO                   │
+└───────────────┬─────────────────────────┘
+                │
+┌───────────────▼─────────────────────────┐
+│   Core Services                         │
+│   ├─ AffinityEngine (情感计算)          │
+│   ├─ ChatEngine (对话编排)              │
+│   ├─ EventEngine (事件触发)             │
+│   ├─ MemorySystem (记忆管理)            │
+│   ├─ TimelineScheduler (时间线调度)     │
+│   └─ RedisManager (状态缓存)            │
+└───────────────┬─────────────────────────┘
+                │
+┌───────────────▼─────────────────────────┐
+│   LLM Adapters (多LLM支持)              │
+│   ├─ Gemini 2.0 Flash ✨                │
+│   ├─ Tencent Hunyuan                    │
+│   ├─ DeepSeek V3.1                      │
+│   └─ Mock Service                       │
+└─────────────────────────────────────────┘
 ```
 
-### 🎯 支持的LLM提供商
+### 📁 项目结构
 
-| 提供商 | 模型 | 特点 | 推荐场景 |
-|--------|------|------|----------|
-| **Gemini** ✨ | gemini-2.0-flash-exp | 最新、最强、响应快 | **生产环境推荐** |
-| DeepSeek | DeepSeek V3.1 | 开源、Gradio接入 | 备选方案 |
-| Mock | 本地模拟 | 快速测试 | 开发调试 |
+```
+AI-Companion/
+├── backend/                    # 后端服务
+│   ├── app/
+│   │   ├── api/               # API路由层
+│   │   │   ├── auth.py        # 用户认证
+│   │   │   ├── companions.py  # 伙伴管理
+│   │   │   ├── chat.py        # 聊天API
+│   │   │   ├── romance.py     # 恋爱攻略
+│   │   │   ├── events.py      # 事件系统
+│   │   │   ├── export.py      # 数据导出
+│   │   │   └── stats.py       # 统计分析
+│   │   ├── services/          # 业务逻辑层
+│   │   │   ├── affinity_engine.py       # 情感计算引擎 ⭐
+│   │   │   ├── chat_engine.py           # 聊天引擎
+│   │   │   ├── event_engine.py          # 事件引擎
+│   │   │   ├── memory_integration.py    # 记忆系统
+│   │   │   ├── redis_utils.py           # Redis工具
+│   │   │   ├── timeline_scheduler.py    # 时间线调度器
+│   │   │   └── llm/                     # LLM适配器
+│   │   │       ├── gemini.py
+│   │   │       ├── hunyuan.py
+│   │   │       ├── deepseek_gradio.py
+│   │   │       └── factory.py
+│   │   ├── config/            # 配置层
+│   │   ├── models/            # 数据模型
+│   │   └── core/              # 核心模块
+│   └── requirements.txt
+│
+├── frontend/                   # 前端应用
+│   ├── src/
+│   │   ├── components/        # Vue组件
+│   │   │   ├── RomancePanel.vue    # 恋爱攻略面板
+│   │   │   └── EventCard.vue       # 事件卡片
+│   │   ├── views/             # 页面视图
+│   │   │   └── Chat.vue            # 聊天页面
+│   │   ├── services/          # API服务
+│   │   ├── stores/            # Pinia状态管理
+│   │   └── types/             # TypeScript类型
+│   └── package.json
+│
+└── docs/                       # 文档
+    ├── QUICKSTART.md           # 快速开始
+    ├── LLM_PROVIDERS.md        # LLM配置指南
+    ├── DEVELOPER_GUIDE.md      # 开发者指南
+    ├── EVENT_SYSTEM_README.md  # 事件系统说明
+    └── UPGRADE_SUMMARY.md      # 升级记录
+```
 
 ## 🚀 快速开始
 
@@ -54,92 +157,255 @@
 
 - Python 3.11+
 - Node.js 18+
+- Redis 6.0+ (可选，用于生产环境)
 
-### 启动步骤
+### 一键启动
 
-**1. 后端启动**
+**方式1：分别启动（推荐用于开发）**
+
 ```bash
+# 1. 启动后端
 cd backend
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 cp .env.example .env
 
-# 🔑 配置API Key (选择一个)
-# 选项1: 使用Gemini (推荐) - 访问 https://ai.google.dev/ 获取API Key
+# 配置LLM提供商（选择一个）
 # 编辑 .env 文件:
-# LLM_PROVIDER=gemini
-# GEMINI_API_KEY=你的API密钥
+# LLM_PROVIDER=gemini  # 推荐
+# GEMINI_API_KEY=你的API密钥  # 访问 https://ai.google.dev/ 获取
 
-# 选项2: 使用DeepSeek/Mock
-# (保持默认配置即可)
+# 初始化数据库和事件数据
+python init_fresh_db.py
+python init_events.py
 
-python -m uvicorn app.main:app --reload
-```
+# 启动服务
+python -m uvicorn app.main:socket_app --reload --host 0.0.0.0 --port 8000
 
-**2. 前端启动** (新终端)
-```bash
+# 2. 启动前端（新终端）
 cd frontend
 npm install
 npm run dev
 ```
 
-**3. 访问应用**
+**方式2：使用启动脚本**
 
-打开浏览器访问 `http://localhost:5173`
+```bash
+# Linux/Mac
+chmod +x backend/start.sh
+./backend/start.sh
 
-📖 **完整教程**: [QUICKSTART.md](docs/QUICKSTART.md)
+# Windows
+backend\start.bat
+```
 
-## 🎭 性格原型
+### 访问应用
 
-### 💖 温柔的倾听者
-- **适合**: 倾诉烦恼、寻求安慰
-- **特质**: 同理心强、语言温暖
+- **前端界面**: http://localhost:5173
+- **后端API**: http://localhost:8000
+- **API文档**: http://localhost:8000/docs
 
-### ✨ 元气的鼓励者
-- **适合**: 需要打气、分享喜悦
-- **特质**: 积极向上、充满活力
+## 📖 详细文档
 
-### 🧠 理性的分析者
-- **适合**: 解决问题、理性分析
-- **特质**: 逻辑清晰、结构化思考
+### 配置指南
+- [快速开始](docs/QUICKSTART.md) - 详细的安装和配置教程
+- [LLM提供商配置](docs/LLM_PROVIDERS.md) - 支持的LLM及配置方法
+- [环境变量说明](docs/ENVIRONMENT.md) - 完整的环境变量列表
 
-## 📚 文档
+### 功能说明
+- [恋爱攻略系统](docs/AI恋爱攻略实施方案.md) - 好感度、礼物、任务系统
+- [事件系统](docs/EVENT_SYSTEM_README.md) - 主线事件和随机事件
+- [动态响应系统](docs/DYNAMIC_RESPONSE_SYSTEM.md) - 情感计算和回复生成
 
-- [快速开始](docs/QUICKSTART.md) - 详细安装教程
-- [Gemini配置](docs/GEMINI_SETUP.md) - Google Gemini API配置指南 ✨
-- [DeepSeek配置](docs/DEEPSEEK_SETUP.md) - DeepSeek模型部署指南
-- [技术设计](AI灵魂伙伴-技术实施计划书.md) - 完整技术方案
+### 开发文档
+- [开发者指南](docs/DEVELOPER_GUIDE.md) - 如何扩展和定制功能
+- [升级记录](docs/UPGRADE_SUMMARY.md) - 系统架构升级说明
+
+## 🎯 使用场景
+
+### 情感倾诉
+```
+用户: "今天工作好累，感觉压力好大..."
+AI: "辛苦了呢...工作确实不容易。要不要和我说说发生了什么？我会好好听的。"
+```
+
+### 逐步升温
+```
+[陌生阶段 - 50分]
+用户: "你好"
+AI: "您好，很高兴认识您。请问有什么可以帮到您的吗？"
+
+[朋友阶段 - 300分]
+用户: "你好"
+AI: "嗨！今天过得怎么样？有什么想聊的吗~"
+
+[恋人阶段 - 920分]
+用户: "你好"
+AI: "宝贝！终于等到你了~ 想死你了！今天想做点什么呢？❤️"
+```
+
+### 事件触发
+```
+[好感度提升到251分]
+系统触发事件: "友谊确认"
+- 展示精美的事件卡片
+- 显示特殊对话内容
+- 获得信任度奖励
+```
+
+## 🔧 LLM配置示例
+
+### Gemini (推荐)
+```bash
+# .env
+LLM_PROVIDER=gemini
+GEMINI_API_KEY=your_api_key_here
+GEMINI_MODEL=gemini-2.0-flash-exp
+```
+
+### Tencent Hunyuan
+```bash
+# .env
+LLM_PROVIDER=hunyuan
+HUNYUAN_SECRET_ID=your_secret_id
+HUNYUAN_SECRET_KEY=your_secret_key
+HUNYUAN_MODEL=hunyuan-lite  # 或 hunyuan-standard, hunyuan-pro
+```
+
+### Mock模式（测试）
+```bash
+# .env
+LLM_PROVIDER=mock
+# 无需配置API Key，直接使用
+```
 
 ## 📈 开发路线
 
-### ✅ Phase 1: MVP (已完成)
-- 基础架构
-- 3种性格原型
-- 实时对话
-- 精美UI
+### ✅ 已完成功能
+- [x] 基础架构（FastAPI + Vue 3 + Redis）
+- [x] 3种性格原型系统
+- [x] AI情感计算引擎
+- [x] 7级好感度分级
+- [x] 实时聊天 + 流式输出
+- [x] 多LLM支持（Gemini/Hunyuan/DeepSeek/Mock）
+- [x] WebSocket实时通信
+- [x] 恋爱攻略系统（礼物/任务/事件）
+- [x] 三层记忆系统架构
+- [x] 事件系统（主线+随机）
+- [x] 数据导出功能
+- [x] 统计分析面板
+- [x] 离线生活模拟
+- [x] 精美UI设计
 
-### 🔄 Phase 2: 增强 (计划中)
-- Redis持久化
-- 流式输出
-- 语音对话
-- VRM虚拟形象
+### 🔄 进行中
+- [ ] 向量数据库集成（Pinecone/Milvus/Chroma）
+- [ ] 长期记忆RAG优化
+- [ ] 性能监控和优化
 
-### 🌟 Phase 3: 高级 (未来)
-- 长期记忆(RAG)
-- 多伙伴管理
-- 主动交互
-- 移动端PWA
+### 🌟 未来计划
+- [ ] 语音对话支持
+- [ ] VRM虚拟形象集成
+- [ ] 多伙伴管理
+- [ ] 主动交互（AI主动发起对话）
+- [ ] 移动端PWA
+- [ ] 多语言支持
+- [ ] AR/VR体验
+- [ ] 社交功能
 
-## 🤝 参考项目
+## 🧪 测试
 
-- [TEN Framework](https://github.com/TEN-framework/ten-framework)
-- [AIRI](https://github.com/moeru-ai/airi)
+### 运行测试
+```bash
+# 后端测试
+cd backend
+python test_dynamic_response.py      # 测试动态响应系统
+python test_affinity_integration.py  # 测试好感度系统
+
+# 前端测试
+cd frontend
+npm run test
+```
+
+### API测试
+```bash
+# 发送消息
+curl -X POST "http://localhost:8000/api/chat/" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "companion_id": 1,
+    "message": "你好！",
+    "session_id": "test-001"
+  }'
+
+# 获取好感度状态
+curl "http://localhost:8000/api/romance/companion/1/state?user_id=test"
+
+# 赠送礼物
+curl -X POST "http://localhost:8000/api/romance/companion/1/gift" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "companion_id": 1,
+    "gift_type": "flower",
+    "gift_name": "红玫瑰",
+    "user_id": "test"
+  }'
+```
+
+## 🤝 参考与致谢
+
+- [TEN Framework](https://github.com/TEN-framework/ten-framework) - 多模态AI框架
+- [AIRI](https://github.com/moeru-ai/airi) - AI伴侣项目
+- [FastAPI](https://fastapi.tiangolo.com/) - 现代Python Web框架
+- [Vue.js](https://vuejs.org/) - 渐进式JavaScript框架
+
+## 📊 技术亮点
+
+1. **两阶段LLM调用架构** - Pass 1情感分析 + Pass 2回复生成
+2. **完全封装的状态管理** - API层无需关心计算细节
+3. **即插即用的记忆系统** - 支持多种向量数据库
+4. **智能保护机制** - 防止好感度异常跳跃和降级
+5. **高度可扩展** - 易于添加新LLM、新事件、新功能
+
+## 🐛 故障排查
+
+### 后端启动失败
+```bash
+# 检查Python版本
+python --version  # 应该是3.11+
+
+# 重新安装依赖
+pip install -r requirements.txt --force-reinstall
+
+# 检查端口占用
+lsof -i :8000  # Linux/Mac
+netstat -ano | findstr :8000  # Windows
+```
+
+### 前端连接失败
+```bash
+# 检查后端是否运行
+curl http://localhost:8000/health
+
+# 检查WebSocket连接
+# 浏览器控制台应该显示 "Socket connected"
+```
+
+### Redis连接问题
+```bash
+# 检查Redis状态
+redis-cli ping  # 应返回PONG
+
+# 如果没有Redis，可以使用内存模式
+# .env中移除REDIS_URL配置
+```
 
 ## 📄 License
 
-MIT
+MIT License - 详见 [LICENSE](LICENSE) 文件
 
 ---
 
-**Made with 💖**
+**Made with 💖 by AI Companion Team**
+
+如有问题或建议，欢迎提交 Issue 或 Pull Request！
