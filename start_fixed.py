@@ -3,6 +3,7 @@
 """
 AI灵魂伙伴 - 统一启动脚本 (Windows优化版)
 同时启动后端和前端服务
+增强版本：支持数据库初始化和记忆系统验证
 """
 import os
 import sys
@@ -36,9 +37,9 @@ def print_colored(text, color):
 
 def print_header(text):
     """打印标题"""
-    print("\n" + "=" * 60)
+    print("\n" + "=" * 70)
     print(f"  {text}")
-    print("=" * 60 + "\n")
+    print("=" * 70 + "\n")
 
 def check_python():
     """检查Python版本"""
@@ -77,16 +78,16 @@ def setup_backend():
     else:
         pip_path = venv_dir / "bin" / "pip"
 
-    # 安装依赖
-    print("[2/3] 安装依赖...")
-    subprocess.run([str(pip_path), "install", "-q", "-r", "requirements.txt"], check=True)
-
     # 创建.env
     env_file = BACKEND_DIR / ".env"
     if not env_file.exists():
         print("[3/3] 创建.env文件...")
         import shutil
-        shutil.copy(".env.example", ".env")
+        if (BACKEND_DIR / ".env.example").exists():
+            shutil.copy(".env.example", ".env")
+            print("       请编辑.env配置LLM API密钥")
+        else:
+            print("[WARN] .env.example文件不存在，跳过")
     else:
         print("[3/3] .env文件已存在")
 
@@ -102,29 +103,104 @@ def setup_frontend():
     node_modules = FRONTEND_DIR / "node_modules"
     if not node_modules.exists():
         print("[1/1] 安装依赖...")
-        subprocess.run("npm install", shell=True, check=True)
+        try:
+            subprocess.run("npm install", shell=True, check=True, timeout=300)
+        except subprocess.TimeoutExpired:
+            print("[ERROR] npm install超时")
+            sys.exit(1)
     else:
         print("[1/1] 依赖已安装")
 
     print("[OK] 前端环境设置完成")
 
-def init_redis_config():
-    """初始化Redis配置"""
+def init_database():
+    """初始化数据库"""
     os.chdir(BACKEND_DIR)
-    
+
     # 获取Python路径
     if platform.system() == "Windows":
         python_path = BACKEND_DIR / "venv" / "Scripts" / "python.exe"
     else:
         python_path = BACKEND_DIR / "venv" / "bin" / "python"
-    
-    print("[Backend] 初始化Redis配置...")
-    try:
-        subprocess.run([str(python_path), "init_redis_config.py"], check=True)
-        print("[OK] Redis配置初始化完成")
-    except subprocess.CalledProcessError as e:
-        print(f"[WARN] Redis配置初始化失败: {e}")
-        print("      系统设置页面可能显示默认数据")
+
+    print("[Backend] 初始化数据库...")
+
+    # 检查数据库文件是否已存在
+    db_file = BACKEND_DIR / "ai_companion.db"
+    if db_file.exists():
+        print("[SKIP] 数据库已存在，跳过初始化")
+        return
+
+    # 执行数据库初始化脚本
+    if (BACKEND_DIR / "init_fresh_db.py").exists():
+        try:
+            print("        这可能需要几秒钟...")
+            subprocess.run([str(python_path), "init_fresh_db.py"], check=True, timeout=120)
+            print("[OK] 数据库初始化完成")
+        except subprocess.TimeoutExpired:
+            print("[WARN] 数据库初始化超时，继续启动")
+        except subprocess.CalledProcessError as e:
+            print(f"[WARN] 数据库初始化失败: {e}")
+    else:
+        print("[SKIP] init_fresh_db.py不存在，跳过")
+
+def init_memory_system():
+    """初始化记忆系统"""
+    os.chdir(BACKEND_DIR)
+
+    # 获取Python路径
+    if platform.system() == "Windows":
+        python_path = BACKEND_DIR / "venv" / "Scripts" / "python.exe"
+    else:
+        python_path = BACKEND_DIR / "venv" / "bin" / "python"
+
+    print("[Backend] 验证记忆系统...")
+
+    # 运行记忆系统测试
+    if (BACKEND_DIR / "test_memory_system.py").exists():
+        try:
+            result = subprocess.run(
+                [str(python_path), "test_memory_system.py"],
+                check=True,
+                timeout=30,
+                capture_output=True,
+                text=True
+            )
+            # 检查是否全部通过
+            if "7/7" in result.stdout or "全部通过" in result.stdout:
+                print("[OK] 记忆系统验证通过 (L1/L2/L3就绪)")
+            else:
+                print("[WARN] 记忆系统部分功能未就绪，但不影响启动")
+        except subprocess.TimeoutExpired:
+            print("[WARN] 记忆系统验证超时")
+        except subprocess.CalledProcessError as e:
+            print(f"[WARN] 记忆系统验证失败，但不影响启动")
+    else:
+        print("[SKIP] test_memory_system.py不存在，跳过")
+
+def init_redis_config():
+    """初始化Redis配置"""
+    os.chdir(BACKEND_DIR)
+
+    # 获取Python路径
+    if platform.system() == "Windows":
+        python_path = BACKEND_DIR / "venv" / "Scripts" / "python.exe"
+    else:
+        python_path = BACKEND_DIR / "venv" / "bin" / "python"
+
+    print("[Backend] 初始化系统配置...")
+
+    # 检查init_redis_config.py是否存在
+    if (BACKEND_DIR / "init_redis_config.py").exists():
+        try:
+            subprocess.run([str(python_path), "init_redis_config.py"], check=True, timeout=30)
+            print("[OK] 系统配置初始化完成")
+        except subprocess.TimeoutExpired:
+            print("[WARN] 配置初始化超时")
+        except subprocess.CalledProcessError as e:
+            print(f"[WARN] 配置初始化失败: {e}")
+    else:
+        print("[SKIP] init_redis_config.py不存在，跳过")
 
 def start_backend():
     """启动后端服务"""
@@ -143,7 +219,7 @@ def start_backend():
     # 启动uvicorn
     return subprocess.Popen([
         str(python_path), "-m", "uvicorn",
-        "app.main:socket_app",  # 使用socket_app而不是app
+        "app.main:socket_app",  # 使用socket_app以支持WebSocket
         "--reload",
         "--host", "127.0.0.1",
         "--port", "8000"
@@ -173,7 +249,10 @@ def main():
         setup_backend()
         setup_frontend()
 
-        # 初始化Redis配置
+        # 初始化数据和系统
+        print_header("初始化系统")
+        init_database()
+        init_memory_system()
         init_redis_config()
 
         # 启动服务
@@ -188,6 +267,7 @@ def main():
         print_header("服务已启动")
         print("[OK] 后端: http://localhost:8000")
         print("[OK] 前端: http://localhost:5173")
+        print("[OK] API文档: http://localhost:8000/docs")
         print("\n按 Ctrl+C 停止所有服务\n")
 
         # 等待中断
@@ -204,6 +284,7 @@ def main():
             frontend_process.kill()
 
             print("[OK] 所有服务已停止")
+            sys.exit(0)
 
     except Exception as e:
         print(f"\n[ERROR] 错误: {e}")

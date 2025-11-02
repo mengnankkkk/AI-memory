@@ -102,6 +102,7 @@ async def chat_v2(
             # 伙伴信息
             companion_id=request.companion_id,
             companion_name=companion.name,
+            personality_archetype=companion.personality_archetype,
             # 当前状态
             current_affinity_score=current_affinity_score,
             current_trust_score=current_trust_score,
@@ -246,6 +247,7 @@ async def chat(
         companion_id=request.companion_id,
         message=request.message,
         personality_type=companion.personality_archetype,
+        companion_name=companion.name,  # 🔥 传递伙伴名称
         interaction_type="chat"
     )
 

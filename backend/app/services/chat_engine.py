@@ -201,7 +201,7 @@ class ChatEngine:
                 return {
                     'id': companion.id,
                     'name': companion.name,
-                    'personality': getattr(companion, 'personality_archetype', 'companion'),
+                    'personality_archetype': getattr(companion, 'personality_archetype', 'companion'),
                     'description': getattr(companion, 'custom_greeting', ''),
                     'prompt_version': getattr(companion, 'prompt_version', 'v1')
                 }
@@ -285,6 +285,7 @@ class ChatEngine:
                 user_id=str(session['user_id']),
                 companion_id=session['companion_id'],
                 companion_name=companion_info['name'],
+                personality_archetype=companion_info.get('personality_archetype', 'listener'),
                 current_affinity_score=companion_state.get('affinity_score', 50),
                 current_trust_score=companion_state.get('trust_score', 50),
                 current_tension_score=companion_state.get('tension_score', 0),
@@ -307,7 +308,7 @@ class ChatEngine:
                 str(session['user_id']),
                 session['companion_id'],
                 companion_info.get('prompt_version', 'v1'),
-                companion_info.get('personality', 'companion')
+                companion_info.get('personality_archetype', 'companion')
             )
 
             # 将回复拆分并发送
@@ -393,6 +394,7 @@ class ChatEngine:
                 user_id=str(user_id),
                 companion_id=companion_id,
                 companion_name=companion_info['name'],
+                personality_archetype=companion_info.get('personality_archetype', 'listener'),
                 current_affinity_score=companion_state.get('affinity_score', 50),
                 current_trust_score=companion_state.get('trust_score', 50),
                 current_tension_score=companion_state.get('tension_score', 0),
@@ -416,7 +418,7 @@ class ChatEngine:
                 str(user_id),
                 companion_id,
                 companion_info.get('prompt_version', 'v1'),
-                companion_info.get('personality', 'companion')
+                companion_info.get('personality_archetype', 'companion')
             )
 
             for chunk in self._chunk_response(assistant_response):

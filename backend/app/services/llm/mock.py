@@ -36,8 +36,33 @@ class MockLLMService(BaseLLMService):
         # 模拟API延迟
         await asyncio.sleep(0.5)
 
-        # 根据性格原型返回不同风格的回复
-        if "温柔" in system_prompt or "倾听" in system_prompt:
+        # 根据真实人设关键词识别角色并返回对应风格的回复
+        # 林梓汐 - 逻辑、数据、普罗米修斯
+        if "林梓汐" in system_prompt or "普罗米修斯" in system_prompt or ("逻辑" in system_prompt and "量化" in system_prompt):
+            return self._get_linzixi_response(user_message)
+
+        # 雪见 - 安全、零信任、防火墙
+        elif "雪见" in system_prompt or ("零信任" in system_prompt) or ("安全主管" in system_prompt):
+            return self._get_xuejian_response(user_message)
+
+        # 凪 - VTuber、直播、画师
+        elif "凪" in system_prompt or "VTuber" in system_prompt or ("直播" in system_prompt and "创作" in system_prompt):
+            return self._get_nagi_response(user_message)
+
+        # 时雨 - 历史、档案、诗意
+        elif "时雨" in system_prompt or ("档案" in system_prompt and "历史" in system_prompt):
+            return self._get_shiyu_response(user_message)
+
+        # Zoe - CEO、硅谷、竞争
+        elif "Zoe" in system_prompt or ("CEO" in system_prompt and "硅谷" in system_prompt):
+            return self._get_zoe_response(user_message)
+
+        # Kevin - DevOps、哥们、游戏
+        elif "凯文" in system_prompt or "Kevin" in system_prompt or ("DevOps" in system_prompt and "哥们" in system_prompt):
+            return self._get_kevin_response(user_message)
+
+        # 旧的通用回复（兼容性）
+        elif "温柔" in system_prompt or "倾听" in system_prompt:
             return self._get_listener_response(user_message)
         elif "元气" in system_prompt or "鼓励" in system_prompt:
             return self._get_cheerleader_response(user_message)

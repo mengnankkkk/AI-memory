@@ -36,7 +36,7 @@ export const companionService = {
 export const chatService = {
   // 发送消息
   async sendMessage(data: ChatRequest): Promise<ChatResponse> {
-    const response = await api.post('/chat/', data)
+    const response = await api.post('/chat/v2', data)
     return response
   },
 

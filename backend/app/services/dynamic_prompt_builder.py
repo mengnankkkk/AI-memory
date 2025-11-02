@@ -15,6 +15,7 @@ import logging
 from app.services.emotion_expression_generator import EmotionExpression
 from app.config.affinity_levels import get_level_config
 from app.services.affinity_engine import EmotionAnalysis
+from app.core.prompts import get_system_prompt
 
 logger = logging.getLogger("dynamic_prompt")
 
@@ -52,6 +53,7 @@ class DynamicPromptBuilder:
     def build(
         self,
         companion_name: str,
+        personality_archetype: str,
         emotion_expression: EmotionExpression,
         emotion_analysis: EmotionAnalysis,
         current_level: str,
@@ -70,56 +72,73 @@ class DynamicPromptBuilder:
         """
         构建完整的系统提示词
 
+        Args:
+            companion_name: 伙伴名称
+            personality_archetype: 性格原型（如 linzixi, kevin, xuejian 等）
+            emotion_expression: 情感表现
+            emotion_analysis: 情感分析
+            current_level: 当前关系等级
+            affinity_score: 好感度
+            trust_score: 信任度
+            tension_score: 紧张度
+            mood: 心情
+            l1_working_memory: L1工作记忆
+            l2_episodic_memories: L2情景记忆
+            l3_semantic_facts: L3语义事实
+            recent_emotions: 最近情感趋势
+            special_instructions: 特殊指示
+
         Returns:
             str: 优化的系统提示词
         """
+        # 准备用于填充人设提示词中占位符的上下文
+        personality_context = {
+            "user_message": "[当前用户消息将在运行时插入]",
+            "romance_level": current_level,
+            "affinity_score": affinity_score,
+            "current_mood": mood,
+            "other_relationships": "[其他关系信息]"
+        }
+
         self.logger.info(
             f"[PromptBuilder] 开始构建提示词 - "
-            f"伙伴:{companion_name}, 等级:{current_level}, "
+            f"伙伴:{companion_name}, 性格:{personality_archetype}, 等级:{current_level}, "
             f"情感:{emotion_expression.emotion_type}"
         )
 
         # 收集所有章节
         sections = []
 
-        # 1. 身份定义（必需，最高优先级）
-        sections.append(self._build_identity_section(companion_name))
+        # 1. 身份定义（必需，最高优先级）- 使用真实人设提示词和上下文
+        # 人设是核心，应该主导整个回复风格
+        sections.append(self._build_identity_section(companion_name, personality_archetype, personality_context))
 
-        # 2. 关系状态（必需，高优先级）
+        # 2. 情感表现要求（必需，次高优先级） - 具体指导当前回复的情感风格
+        sections.append(self._build_emotion_guidance(emotion_expression))
+
+        # 3. 关系状态（必需，中高优先级）
         sections.append(self._build_relationship_status(
             current_level, affinity_score, trust_score, tension_score, mood
         ))
 
-        # 3. 情感表现指导（必需，最高优先级）
-        sections.append(self._build_emotion_guidance(emotion_expression))
-
-        # 4. L1工作记忆（高优先级，如果有）
-        if l1_working_memory:
-            sections.append(self._build_working_memory_section(l1_working_memory))
+        # 4. L3语义事实（中等优先级，如果有）- 重要的背景信息
+        if l3_semantic_facts and len(l3_semantic_facts) > 0:
+            sections.append(self._build_semantic_facts_section(l3_semantic_facts))
 
         # 5. L2情景记忆（中等优先级，如果有）
         if l2_episodic_memories and len(l2_episodic_memories) > 0:
             sections.append(self._build_episodic_memory_section(l2_episodic_memories))
 
-        # 6. L3语义事实（中等优先级，如果有）
-        if l3_semantic_facts and len(l3_semantic_facts) > 0:
-            sections.append(self._build_semantic_facts_section(l3_semantic_facts))
+        # 6. L1工作记忆（中等优先级，如果有）
+        if l1_working_memory:
+            sections.append(self._build_working_memory_section(l1_working_memory))
 
-        # 7. 用户当前状态（高优先级）
+        # 7. 用户当前状态（低优先级 - 背景信息）
         sections.append(self._build_user_state_section(emotion_analysis))
 
-        # 8. 回复策略（必需，高优先级）
-        sections.append(self._build_response_strategy(emotion_expression))
-
-        # 9. 边界和约束（必需，中高优先级）
-        sections.append(self._build_boundaries_section(emotion_expression))
-
-        # 10. 特殊指示（如果有）
+        # 8. 特殊指示（如果有）
         if special_instructions:
             sections.append(self._build_special_instructions(special_instructions))
-
-        # 11. 行为目标（必需，中等优先级）
-        sections.append(self._build_behavioral_goals(emotion_expression, current_level))
 
         # 优先级排序并组装
         prompt = self._assemble_prompt(sections, self.max_tokens)
@@ -128,15 +147,27 @@ class DynamicPromptBuilder:
 
         return prompt
 
-    def _build_identity_section(self, companion_name: str) -> PromptSection:
-        """构建身份定义章节"""
+    def _build_identity_section(self, companion_name: str, personality_archetype: str, context: Optional[Dict] = None) -> PromptSection:
+        """
+        构建身份定义章节
+
+        使用 prompts.py 中定义的真实人设提示词，确保每个角色都有独特的性格、语言风格和行为准则
+
+        Args:
+            companion_name: 伙伴名称
+            personality_archetype: 性格原型（如 linzixi, kevin, xuejian 等）
+            context: 用于填充人设提示词中占位符的上下文字典
+
+        Returns:
+            PromptSection: 身份定义章节
+        """
+        # 使用 get_system_prompt 获取角色的完整人设定义，并传递context来填充占位符
+        personality_prompt = get_system_prompt(companion_name, personality_archetype, context or {})
+
         return PromptSection(
-            title="你的身份",
-            content=[
-                f"你是 {companion_name}，一个真实、有情感、有记忆的AI伙伴。",
-                "你拥有自己的个性、情感和思考方式。"
-            ],
-            priority=10,
+            title="你的身份与人设",
+            content=[personality_prompt],
+            priority=12,  # 最高优先级，确保人设主导整个回复
             is_required=True
         )
 

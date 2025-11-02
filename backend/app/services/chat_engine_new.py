@@ -9,6 +9,7 @@ from typing import Dict, List, Optional, AsyncIterator
 import socketio
 from app.services.streaming_llm import streaming_llm_service
 from app.services.memory_manager import memory_manager, SystemPromptGenerator, content_filter
+from app.services.response_coordinator import response_coordinator
 from app.core.config import settings
 from app.models.companion import Companion
 from app.models.chat_session import ChatSession, ChatMessage
@@ -106,82 +107,113 @@ class ChatEngine:
             await memory_manager.clear_session(session_id)
             logger.info(f"移除聊天会话: {session_id}")
     
-    async def get_companion_info(self, companion_id: int) -> Optional[Dict]:
-        """获取伙伴信息"""
+    async def get_companion_info(self, companion_id: int) -> Optional[Companion]:
+        """获取完整的伙伴对象"""
         try:
             async with async_session_maker() as db:
                 result = await db.execute(
                     select(Companion).where(Companion.id == companion_id)
                 )
                 companion = result.scalar_one_or_none()
-                
-                if not companion:
-                    return None
-                
-                return {
-                    'id': companion.id,
-                    'name': companion.name,
-                    'personality': getattr(companion, 'personality_archetype', 'companion'),
-                    'description': getattr(companion, 'custom_greeting', '')
-                }
+                return companion
         except Exception as e:
             logger.error(f"获取伙伴信息失败: {e}")
             return None
     
     async def process_message(self, session_id: str, user_message: str) -> AsyncIterator[str]:
-        """处理用户消息并流式返回回复"""
+        """处理用户消息并流式返回回复 - 使用双阶段协议"""
         session = await self.get_session(session_id)
         if not session:
             yield "抱歉，会话已过期，请刷新页面重试。"
             return
-        
+
         try:
             # 内容安全检查
             is_safe, filter_reason = await content_filter.is_content_safe(user_message)
             if not is_safe and filter_reason:
                 yield content_filter.get_filtered_response(filter_reason)
                 return
-            
+
             # 保存用户消息到数据库
             await self.save_message_to_db(session_id, "user", user_message)
-            
-            # 添加用户消息到内存会话
-            await memory_manager.add_message(session_id, "user", user_message)
-            
-            # 获取伙伴信息
-            companion_info = await self.get_companion_info(session['companion_id'])
-            if not companion_info:
+
+            # 获取完整的伙伴对象
+            companion = await self.get_companion_info(session['companion_id'])
+            if not companion:
                 yield "抱歉，找不到对应的AI伙伴信息。"
                 return
-            
-            # 生成系统提示词
-            system_prompt = SystemPromptGenerator.generate_system_prompt(
-                companion_name=companion_info['name'],
-                personality_type=companion_info.get('personality', 'companion')
+
+            # 从Redis获取好感度状态
+            from app.services.redis_affinity_manager import redis_affinity_manager
+            companion_state = await redis_affinity_manager.get_companion_state(
+                session['user_id'], session['companion_id']
             )
-            
-            # 获取会话上下文（优先从数据库加载历史）
+
+            current_affinity_score = companion_state.get("affinity_score", 50) if companion_state else 50
+            current_trust_score = companion_state.get("trust_score", 50) if companion_state else 50
+            current_tension_score = companion_state.get("tension_score", 0) if companion_state else 0
+            current_mood = companion_state.get("current_mood", "neutral") if companion_state else "neutral"
+            current_level = companion_state.get("romance_level", "stranger") if companion_state else "stranger"
+
+            # 获取对话历史
             db_history = await self.load_chat_history(session_id, limit=8)
-            if db_history:
-                # 使用数据库历史
-                context_messages = db_history
-            else:
-                # 回退到内存会话
-                context_messages = await memory_manager.get_session_context(session_id)
-            
-            # 调用 LLM 进行流式回复
-            assistant_response = ""
-            async for chunk in self.stream_llm_response(system_prompt, context_messages):
-                assistant_response += chunk
+            conversation_history = []
+            for msg in db_history:
+                conversation_history.append({
+                    "role": msg['role'],
+                    "content": msg['content']
+                })
+
+            logger.info(
+                f"[WebSocket] 使用双阶段协议处理消息 - "
+                f"伙伴:{companion.name}, 等级:{current_level}, 好感度:{current_affinity_score}"
+            )
+
+            logger.info(
+                f"[WebSocket] DEBUG - companion对象信息: "
+                f"ID={companion.id}, name={companion.name}, "
+                f"personality_archetype={companion.personality_archetype}"
+            )
+
+            # 使用ResponseCoordinator执行完整的双阶段协议
+            coordinated_response = await response_coordinator.coordinate_response(
+                user_message=user_message,
+                user_id=session['user_id'],
+                companion_id=session['companion_id'],
+                companion_name=companion.name,
+                personality_archetype=companion.personality_archetype,
+                current_affinity_score=current_affinity_score,
+                current_trust_score=current_trust_score,
+                current_tension_score=current_tension_score,
+                current_level=current_level,
+                current_mood=current_mood,
+                conversation_history=conversation_history,
+                enable_memory=True,
+                debug_mode=False
+            )
+
+            response = coordinated_response.ai_response
+
+            logger.info(
+                f"[WebSocket] 双阶段协议完成 - "
+                f"情感:{coordinated_response.emotion_analysis.primary_emotion}, "
+                f"回复长度:{len(response)}"
+            )
+
+            # 保存助手回复到数据库
+            await self.save_message_to_db(session_id, "assistant", response)
+
+            # 将完整响应分块流式输出（模拟打字效果）
+            chunk_size = 3  # 每次输出3个字符
+            for i in range(0, len(response), chunk_size):
+                chunk = response[i:i+chunk_size]
                 yield chunk
-            
-            # 保存助手回复到数据库和内存
-            if assistant_response:
-                await self.save_message_to_db(session_id, "assistant", assistant_response)
-                await memory_manager.add_message(session_id, "assistant", assistant_response)
-                
+                await asyncio.sleep(0.05)
+
         except Exception as e:
             logger.error(f"处理消息时出错: {e}")
+            import traceback
+            traceback.print_exc()
             yield "抱歉，我现在遇到了一些技术问题，请稍后再试。😅"
     
     async def stream_llm_response(self, system_prompt: str, messages: List[Dict]) -> AsyncIterator[str]:

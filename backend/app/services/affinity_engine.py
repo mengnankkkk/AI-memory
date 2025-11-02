@@ -111,6 +111,7 @@ class AffinityEngine:
         current_level: str,
         current_mood: str,
         companion_name: str,
+        personality_archetype: str,  # 新增：人物原型
         user_id: str,
         companion_id: int,
         recent_memories: Optional[List[str]] = None,
@@ -191,6 +192,7 @@ class AffinityEngine:
         # 生成增强的系统Prompt（集成记忆）
         enhanced_system_prompt = self._build_enhanced_system_prompt(
             companion_name=companion_name,
+            personality_archetype=personality_archetype,  # 传递人物原型
             current_level=new_level,
             current_mood=current_mood,
             affinity_score=new_affinity_score,
@@ -761,6 +763,7 @@ class AffinityEngine:
     def _build_enhanced_system_prompt(
         self,
         companion_name: str,
+        personality_archetype: str,  # 新增参数
         current_level: str,
         current_mood: str,
         affinity_score: int,
@@ -773,15 +776,26 @@ class AffinityEngine:
         """
         构建增强的系统Prompt
 
-        关键创新：融合三层记忆系统
+        关键创新：融合三层记忆系统 + 人物提示词
         """
         level_config = get_level_config(current_level)
-        response_rule = get_response_rule(current_level)
 
-        # 基础部分
+        # 【核心修改】：使用人物提示词，而不是通用默认提示词
+        personality_context = {
+            "user_message": "[当前用户消息将在运行时插入]",
+            "romance_level": current_level,
+            "affinity_score": affinity_score,
+            "current_mood": current_mood,
+            "other_relationships": "[其他关系信息]"
+        }
+
+        # 获取人物特定的提示词（来自 prompts.py）
+        personality_prompt = get_system_prompt(companion_name, personality_archetype, personality_context)
+
+        # 基础部分：先放人物提示词
         prompt_parts = [
-            f"# 你的身份",
-            f"你是{companion_name}。",
+            f"# 你的身份与人设",
+            personality_prompt,
             "",
             f"# 当前关系状态",
             f"- 关系等级: {level_config.name} ({level_config.description})",
@@ -790,12 +804,6 @@ class AffinityEngine:
             f"- 紧张度: {tension_score}/100",
             f"- 亲密度: {level_config.intimacy_level}/10",
             f"- 你的心情: {current_mood}",
-            "",
-            f"# 回复风格要求",
-            f"- 称呼方式: {', '.join(level_config.addressing_style[:2])}",
-            f"- 正式程度: {level_config.response_formality}",
-            f"- 表情使用: {level_config.emoji_usage}",
-            f"- 禁止使用: {', '.join(response_rule.forbidden_words) if response_rule.forbidden_words else '无限制'}",
             ""
         ]
 
@@ -828,12 +836,7 @@ class AffinityEngine:
                 ""
             ])
 
-        # 行为指导
-        prompt_parts.extend([
-            "# 你的任务",
-            f"请根据以上所有信息，以{companion_name}的身份，用符合当前关系等级的方式回复用户。",
-            "要自然、真诚，并体现出你对用户的了解和记忆。",
-        ])
+        # 不再添加通用的"行为指导"，因为人物提示词已经包含了详细的行为准则
 
         return "\n".join(prompt_parts)
 
@@ -904,27 +907,53 @@ async def analyze_and_update_affinity(
     user_id: str,
     companion_id: int,
     message: str,
-    personality_type: str,
+    personality_type: str,  # 保持向后兼容
+    companion_name: Optional[str] = None,  # 新增：伙伴显示名称
     interaction_type: str = "chat"
 ) -> Dict[str, Any]:
     """
     便捷接口：分析用户消息并自动更新好感度
-    
+
     这是一个高级封装接口，其他服务可以直接调用：
     - 自动获取当前状态
     - 自动分析消息
     - 自动更新数据库
     - 返回分析结果
-    
-    使用示例：
+
+    Args:
+        user_id: 用户ID
+        companion_id: 伙伴ID
+        message: 用户消息
+        personality_type: 人物原型（如 linzixi, kevin）
+        companion_name: 伙伴显示名称（如"林梓汐"、"凯文"），如果不提供则从数据库查询
+        interaction_type: 交互类型
+
+    使用示例:
     result = await analyze_and_update_affinity(
         user_id="user123",
         companion_id=1,
         message="谢谢你的帮助！",
-        personality_type="linzixi"
+        personality_type="linzixi",
+        companion_name="林梓汐"
     )
     """
     try:
+        # 如果没有提供 companion_name，从数据库查询
+        if not companion_name:
+            from app.core.database import async_session_maker
+            from app.models.companion import Companion
+            from sqlalchemy import select
+
+            async with async_session_maker() as db:
+                result = await db.execute(
+                    select(Companion).where(Companion.id == companion_id)
+                )
+                companion = result.scalar_one_or_none()
+                if companion:
+                    companion_name = companion.name
+                else:
+                    companion_name = personality_type  # 回退到使用 personality_type
+
         # 1. 获取当前状态
         companion_state = await redis_affinity_manager.get_companion_state(user_id, companion_id)
         
@@ -942,7 +971,8 @@ async def analyze_and_update_affinity(
             current_tension_score=current_tension_score,
             current_level=current_level,
             current_mood=current_mood,
-            companion_name=personality_type,
+            companion_name=companion_name,
+            personality_archetype=personality_type,  # personality_type 就是 personality_archetype
             user_id=user_id,
             companion_id=companion_id
         )

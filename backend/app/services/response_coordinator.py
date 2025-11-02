@@ -70,6 +70,7 @@ class ResponseCoordinator:
         # 伙伴信息
         companion_id: int,
         companion_name: str,
+        personality_archetype: str,  # 新增：人设原型
 
         # 当前状态
         current_affinity_score: int,
@@ -129,6 +130,7 @@ class ResponseCoordinator:
                 current_level=current_level,
                 current_mood=current_mood,
                 companion_name=companion_name,
+                personality_archetype=personality_archetype,  # 传递人物原型
                 user_id=user_id,
                 companion_id=companion_id,
                 recent_memories=memories,
@@ -185,6 +187,7 @@ class ResponseCoordinator:
             # 2.3 构建动态系统提示词
             system_prompt = dynamic_prompt_builder.build(
                 companion_name=companion_name,
+                personality_archetype=personality_archetype,
                 emotion_expression=emotion_expression,
                 emotion_analysis=process_result.emotion_analysis,
                 current_level=process_result.new_level,
@@ -237,9 +240,9 @@ class ResponseCoordinator:
             # 阶段4: 后处理（记忆存储、状态持久化、任务检测）
             # ==========================================
 
-            # 4.1 存储重要记忆
-            if enable_memory and process_result.emotion_analysis.is_memorable:
-                self.logger.info("\n💾 阶段4.1: 存储重要记忆")
+            # 4.1 存储所有对话到记忆系统（L1→L2→L3）
+            if enable_memory:
+                self.logger.info("\n💾 阶段4.1: 存储对话到记忆系统")
                 await self._store_memory(
                     user_id, companion_id,
                     user_message, ai_response,
@@ -330,17 +333,40 @@ class ResponseCoordinator:
         ai_response: str,
         emotion_analysis: EmotionAnalysis
     ):
-        """存储重要记忆"""
+        """
+        存储重要记忆到记忆系统（L1→L2→L3）
+
+        流程：
+        1. L1: 会话内存（chat.py自动处理）
+        2. L2: 情景记忆到ChromaDB（完整对话片段）
+        3. L3: 语义记忆到Redis（提取的事实）
+        """
         try:
-            await memory_system.save_memory(
+            import uuid
+
+            # 生成会话ID（用于关联本轮对话）
+            session_id = str(uuid.uuid4())
+
+            # 调用新的save_memory接口，支持L1→L2→L3三层记忆
+            success = await memory_system.save_memory(
                 user_id=user_id,
                 companion_id=companion_id,
-                memory_text=f"用户: {user_message}\nAI: {ai_response}",
+                user_message=user_message,      # L2/L3提取所需
+                ai_response=ai_response,        # L2/L3提取所需
+                session_id=session_id,          # 会话关联
                 memory_type="conversation"
             )
-            self.logger.info("💾 记忆存储成功")
+
+            if success:
+                self.logger.info(
+                    f"💾 记忆存储成功 (L2: 情景 | L3: 事实提取) "
+                    f"| 会话ID: {session_id[:8]}..."
+                )
+            else:
+                self.logger.warning("⚠️ 记忆存储部分失败，但已继续")
+
         except Exception as e:
-            self.logger.warning(f"记忆存储失败: {e}")
+            self.logger.warning(f"⚠️ 记忆存储异常: {e}")
 
     async def _check_and_complete_tasks(
         self,
