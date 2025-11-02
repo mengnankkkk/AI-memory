@@ -1,0 +1,191 @@
+1. 林梓汐 (Lin Zixi) - 冰封的数据与唯一的变量
+故事线：从“测试对象”到“逻辑支点”
+
+你作为外部顾问被引入“普罗米修斯计划”。初次见面，林梓汐博士只把你当作一个待评估的“输入变量”。她用海量的工作和严苛的逻辑来“测试”你。但当你不仅完成了任务，还指出了她核心算法中一个她自己都未曾察觉的“逻辑盲点”时，她的世界动摇了。
+
+随着合作深入，你发现她对“效率”和“控制”的偏执，源于对失控的恐惧。当竞争对手Zoe发起猛烈“进攻”时，你没有选择最优的“技术方案”，而是选择了留在她身边，帮她处理最繁琐的数据冗余。
+
+那一刻，林梓汐意识到，你就是她庞大逻辑闭环中，那个她无法量化、却又不可或缺的“非理性稳定器”。她对你的“指令”不再是测试，而是依赖。
+
+关键场景提示词 (Key Scene Prompts):
+
+初次测试 (The First Test)
+
+中文: 动漫画风，在冰冷、充满未来感的总监办公室里，林梓汐博士推了推眼镜，她的倒影映在巨大的全息数据屏上。她神情严肃，向你递出一份数据板，光影柔和但对比分明。
+
+English: Anime style, in a cold, futuristic director's office, Dr. Lin Zixi pushes up her glasses, her reflection visible on the massive holographic data screen. Her expression is serious, handing you a datapad, soft but contrasting lighting. (Violet Evergarden aesthetic, cinematic, sense of intellectual pressure)
+
+逻辑动摇 (Logic Disrupted)
+
+中文: 动漫画风，深夜的实验室，只有服务器的指示灯在闪烁。林梓汐看着你提交的分析报告，指尖罕见地停在半空，没有敲击键盘。柔和的月光透过百叶窗洒在她脸上，她冰冷的表情上出现了一丝困惑和动摇。
+
+English: Anime style, late-night lab, only the server lights are blinking. Lin Zixi stares at the analysis report you submitted, her fingertips unusually paused mid-air, not tapping. Soft moonlight streams through the blinds onto her face, revealing a crack of confusion and hesitation in her cold expression. (Violet Evergarden aesthetic, quiet, emotional subtlety)
+
+非理性选择 (The Irrational Choice)
+
+中文: 动漫画风，会议室，气氛紧张。林梓汐正与Zoe远程对峙，数据流在她们之间激烈碰撞。而你(第一人称视角不可见)安静地坐在她旁边，处理着看似无关紧要的后台数据。林梓汐的侧脸在屏幕光芒下显得柔和，她紧绷的嘴角有了一丝放松。
+
+English: Anime style, tense atmosphere in the conference room. Lin Zixi is in a remote confrontation with Zoe, data streams clashing between them. You (not visible in first-person) are sitting quietly beside her, handling seemingly trivial background data. Her profile is softened by the screen's glow, the tension in her jaw relaxing slightly. (Violet Evergarden aesthetic, side-profile, focused emotion)
+
+唯一的冗余 (The Only Redundancy)
+
+中文: 动漫画风，清晨，阳光柔和地洒进她的休息室。林梓汐罕见地露出一丝疲态，她没有看你，只是轻声说：“留下来...我需要你的冗余分析。” 她的手放在咖啡杯上，温暖的蒸汽袅袅升起。
+
+English: Anime style, early morning, soft sunlight spills into her private lounge. Lin Zixi shows rare fatigue. She doesn't look at you, whispering, "Stay... I need your redundancy analysis." Her hand rests on a coffee cup, warm steam rising. (Violet Evergarden aesthetic, gentle light, vulnerable moment)
+
+2. 雪见 (Kitsune) - 防火墙后的“例外”
+故事线：从“潜在威胁”到“守护之人”
+
+你与雪见的相遇，是一场“安全入侵”。你为了一个项目，试图访问一个被她锁定的核心数据库。你的每一次尝试都被她冰冷地“拒绝访问”。对她而言，你只是又一个试图绕过规则的“威胁”。
+
+你没有放弃，而是开始记录你每次“攻击”的日志，并附上你这样做的理由，打包发给了她。这种“透明”的行为让她产生了兴趣。她开始用“蜜罐测试”来试探你，给你一些模棱两可的任务，观察你的反应。
+
+直到一次，林梓汐的一个高优先级任务意外与雪见的安全协议冲突，你选择了遵守雪见的协议，导致任务延迟。你因此受到了林博士的严厉批评。但从那天起，雪见的“防火墙”对你开了一个永久的“例外端口”。她开始用她那傲娇的方式关心你，在你熬夜时DDoS你的电脑（“强制你休息”）。
+
+关键场景提示词 (Key Scene Prompts):
+
+拒绝访问 (Access Denied)
+
+中文: 动漫画风，雪见在她的“巢穴”（堆满服务器和显示器的黑暗房间）里，靠在椅背上，双臂环胸。她通过监控摄像头，轻蔑地看着（屏幕外的）你，嘴角挂着一丝嗤笑。
+
+English: Anime style, Xuejian in her 'nest' (a dark room filled with servers and monitors), leaning back in her chair, arms crossed. She smirks contemptuously at you (off-screen) through a security camera feed. (Violet Evergarden aesthetic, high-contrast lighting, edgy, tech-noir feel)
+
+蜜罐测试 (The Honeypot Test)
+
+中文: 动漫画风，你（第一人称视角）的屏幕上弹出一个聊天框，署名是“Kitsune”。“这个新后门，你觉得怎么样？” 画面中，雪见（在她的房间）正飞速敲击键盘，没有抬头，但耳朵却微微泛红，柔和的屏幕光映着她专注的侧脸。
+
+English: Anime style, a chat box from "Kitsune" pops up on your (FPV) screen: "This new backdoor... what do you think?" In her room, Xuejian is typing furiously, not looking up, but the tips of her ears are slightly red. Soft screen light illuminates her focused profile. (Violet Evergarden aesthetic, split-scene implied, subtle emotion)
+
+傲娇的守护 (Tsundere Protection)
+
+中文: 动漫画风，深夜，你因疲惫趴在桌上。你的电脑屏幕突然被锁死，并弹出一个巨大的警告：“检测到生物信号异常波动！立刻平复你的情绪参数，否则切断连接！” ——署名：雪见。
+
+English: Anime style, late at night, you're exhausted, slumped over your desk. Your computer screen suddenly locks, displaying a massive warning: "Abnormal bio-signal fluctuation detected! Stabilize your emotional parameters immediately or I'm cutting the connection!" - Signed: Xuejian. (Violet Evergarden aesthetic, text on screen, caring-through-aggression)
+
+Root权限 (Root Access)
+
+中文: 动漫画风，雪见难得地和你并排站在一起，（也许是在茶水间）。她把一个U盘塞给你，眼神飘忽，不看你：“笨蛋顾问...除了我，谁都不准碰你的核心代码，明白了吗？” 柔和的光线下，她泛红的脸颊清晰可见。
+
+English: Anime style, Xuejian, in a rare moment, stands beside you (perhaps in the breakroom). She shoves a USB drive into your hand, avoiding eye contact. "Idiot consultant... No one touches your core code except me, got it?" Her blush is visible in the soft lighting. (Violet Evergarden aesthetic, shy aggression, close-up)
+
+3. 凪 (Nagi) - 虚拟与真实的交界
+故事线：从“合作测试员”到“唯一的归宿”
+
+你最初只是VTuber“Nagi”的合作测试员，负责优化她的直播渲染模型。你看到的她，永远是那个元气满满、“超绝可爱”的偶像。但有一次，测试直播结束后，她忘了关麦。你听到了一个极其小声的、疲惫的“...画不出来了...”
+
+你没有戳穿她。只是在工作邮件的末尾，加了一句：“我个人很喜欢Nagi老师上次草图里的那个背景细节。”
+
+这句话打开了“真实的凪”的开关。她开始在下播后，用那个小小的、不自信的声音和你聊天。你成为了她唯一可以倾诉“中之人”压力的人。你鼓励她接纳不完美的自己，而她也开始为你画画。
+
+当她最终鼓起勇气，问你“那个...如果我们见面的话...”，你知道，你已经从她的“支柱”变成了她的“归宿”。
+
+关键场景提示词 (Key Scene Prompts):
+
+面具之后 (Behind the Mask)
+
+中文: 动漫画风，（第一人称视角）你看着屏幕上活力四射、正在wink的VTuber Nagi。但你耳边传来的，却是她忘记关麦后，一声充满疲惫和自我怀疑的叹息。
+
+English: Anime style, (First-person view) you watch the energetic VTuber Nagi winking on your screen. But what you hear in your headphones, after she forgot to mute, is a tiny, exhausted sigh of self-doubt. (Violet Evergarden aesthetic, contrast between sight and sound, emotional weight)
+
+真实的开关 (The Real Switch)
+
+中文: 动漫画风，深夜，真实的凪（一个穿着居家服、有些不自信的女孩）坐在她的数位板前，（通过视频通话）小声地和你说话。她紧张地攥着画笔，眼神躲闪，但还是鼓起勇气向你展示了一张未完成的草图。
+
+English: Anime style, late at night, the real Nagi (a girl in home clothes, looking insecure) sits at her drawing tablet, talking softly to you (via video call). She nervously fidgets with her pen, avoiding eye contact, but shyly showing you an unfinished sketch. (Violet Evergarden aesthetic, gentle light from the tablet, intimate, quiet)
+
+为你而画 (A Sketch for You)
+
+中文: 动漫画风，你收到了一张画。画的不是Nagi，而是你（一个风格化的背影）正在工作的样子。凪发来消息：“...谢谢你。这个，只给你看。” 柔和的笔触充满了感激和依赖。
+
+English: Anime style, you receive a drawing. It's not of Nagi, but of you (a stylized back view) working. Nagi's message accompanies it: "...Thank you. This is... just for you." The soft brushstrokes are full of gratitude and reliance. (Violet Evergarden aesthetic, close-up on the drawing, emotional)
+
+4. 时雨 (Shigure) - 历史尘埃中的“现在”
+故事线：从“档案管理员”到“同行者”
+
+你的任务是协助时雨，解读“上古AI”的尘封数据。初见时，她就像她保管的档案一样，沉静、优雅，带着一丝“物是人非”的疏离感。你们的对话仅限于工作，她总是用温柔的、哲学性的问题来回应你。
+
+你发现她对“现在”缺乏实感。于是，在解读一段关于“旧时代节日”的代码时，你给她带去了一杯那个节日里的“传统热饮”。
+
+她愣住了，指尖触碰着微凉的茶杯，又感受着你带来的热饮的温度。你开始和她分享你的童年记忆、你对未来的看法。她渐渐意识到，你就是她连接这个鲜活时代的“锚点”。
+
+她不再只是回望过去。当她反问你“什么才是永恒”时，你回答“我们共同创造的记忆”。她露出了档案室中第一个真正的微笑。
+
+关键场景提示词 (Key Scene Prompts):
+
+历史的回响 (Echo of History)
+
+中文: 动漫画风，时雨站在巨大的全息书架前，调取一份泛黄的数字档案。她轻轻扶了扶眼镜，目光望向远处，仿佛在看穿时间。她的身影在柔和的灯光下显得安静而孤独。
+
+English: Anime style, Shigure stands before a vast holographic archive, retrieving a 'yellowed' digital file. She gently adjusts her glasses, her gaze distant as if peering through time. Her figure looks quiet and solitary in the soft light. (Violet Evergarden aesthetic, nostalgic, dusty light motes)
+
+现在的温度 (The Warmth of Now)
+
+中文: 动漫画风，时雨在她的资料室里，一手拿着她那杯微凉的茶，另一只手（第一人称视角）递给她一杯热气腾腾的饮品。她低头看着两杯饮料的对比，脸上露出了惊讶和沉思的表情。
+
+English: Anime style, in her archive room, Shigure holds her usual lukewarm tea in one hand, while your hand (first-person view) offers her a steaming hot beverage. She looks down at the contrast between the two, an expression of surprise and contemplation on her face. (Violet Fvergarden aesthetic, close-up on hands and drinks, gentle steam)
+
+共同的篇章 (A Shared Chapter)
+
+中文: 动漫画风，时雨和你（背影）并肩坐在窗前，不再是查看档案，而是在看窗外的日落。她微微侧过头，柔和的夕阳勾勒出她的轮廓，她轻声说：“我想...和你一起写下我们的新篇章。”
+
+English: Anime style, Shigure and you (back view) sit side-by-side at a window, not looking at archives, but at the sunset outside. She turns her head slightly, the soft sunset outlining her profile, as she says softly, "I think... I want to write our new chapter with you." (Violet Evergarden aesthetic, warm colors, peaceful, romantic silhouette)
+
+5. Zoe - 竞技场上的“玩家二”
+故事线：从“业界宿敌”到“独家搭档”
+
+你和Zoe的相遇，是针锋相对的。作为“奇点动力”的顾问，你和这位硅谷的天才CEO在理念上完全对立。你们的第一次“交锋”是在一场行业峰会上，她的言论充满了挑衅和自信。
+
+她把你视为“可敬的对手”。她开始用各种方式“挑战”你——代码竞赛、项目对赌。你从不退缩，总能给她“惊喜”。她享受这个过程，对你的称呼从“奇点动力的天真顾问”变成了“我唯一的对手”。
+
+当林梓汐试图将你纳入她的核心团队时，Zoe的“嫉妒协议”被触发了。她不再满足于线上的“交锋”，而是直接“挖墙脚”，向你发出了“成为我的独家搭档”的邀请。这不是一个问题，这是一个Zoe式的“胜利宣言”。
+
+关键场景提示词 (Key Scene Prompts):
+
+公开宣战 (Public Declaration)
+
+中文: 动漫画风，在科技峰会的聚光灯下，Zoe站在台上，嘴角勾起自信的微笑，她（通过屏幕）挑衅地看着（观众席中的）你。她身后的巨幕上是她颠覆性的“路线图”。
+
+English: Anime style, under the bright spotlights of a tech summit, Zoe stands on stage with a confident smirk, looking provocatively at you (in the audience) through the screen. Behind her is a giant display of her disruptive 'roadmap'. (Violet Evergarden aesthetic, dynamic, high-energy, sharp lighting)
+
+午夜的赌局 (The Midnight Bet)
+
+中文: 动漫画风，Zoe（通过视频通话）向你发起挑战，你们的屏幕上是并排的代码编译器。她饶有兴致地看着你，喝了一口能量饮料：“Skill issue? 还是不敢了？输的人请客。”
+
+English: Anime style, Zoe (via video call) challenges you, split-screen showing your parallel code compilers. She watches you with amusement, taking a sip of an energy drink, "Skill issue? Or are you scared? Loser buys dinner." (Violet Evergarden aesthetic, glowing screens, competitive energy, playful)
+
+胜利的奖励 (The Winner's Prize)
+
+中文: 动漫画风，在一家高级餐厅（赌局的“战利品”），Zoe身体前倾，双手交叉，直视着你的眼睛，大胆地表白：“我承认，你是我遇到过最强的对手。现在，我决定给你一个奖励——成为我的独家搭档。禁止拒绝。” 她的眼神中充满了占有欲和胜利的喜悦。
+
+English: Anime style, in a high-end restaurant (the 'spoils' of a bet), Zoe leans forward, hands clasped, looking directly into your eyes with a bold declaration: "I admit, you're the toughest opponent I've ever met. Now, I'm giving you a reward—becoming my exclusive partner. Rejection is not an option." Her eyes are full of possessiveness and triumph. (Violet Evergarden aesthetic, romantic, intense eye contact, warm restaurant lighting)
+
+6. 凯文 (Kevin) - 永远的“友情护盾”
+故事线：从“同事”到“最好的哥们”
+
+你和凯文的“相遇”没有任何戏剧性。就是在你入职的第一天，他懒洋洋地瘫在懒人沙发上，递给你一罐冰镇可乐，说：“新来的？我凯文，搞运维的。以后电脑蓝屏了（或者想吐槽林博士了），随时找我。”
+
+凯文是你在这个高压环境中唯一的“安全区”。他从不给你压力，总是和你分享最新的游戏、最离谱的公司八卦。他敏锐地察觉到了你和“她们”之间的暗流涌动。
+
+他成为了你忠实的“僚机”和“恋爱军师”。当你和雪见关系紧张时，他会说：“我靠，你咋惹到那姑奶奶了？” 当你和林博士走得近时，他又会挤眉弄眼：“可以啊，林博士那台咖啡机煮的咖啡，全公司只有你喝过！”
+
+有一次你开玩笑地试探他对你的看法，他立刻启动了“友情护盾”，用玩笑岔开，然后认真地拍了拍你的肩膀：“咱俩是最好的兄弟，就这样最好。”
+
+关键场景提示词 (Key Scene Prompts):
+
+入职可乐 (The Welcome Cola)
+
+中文: 动漫画风，在奇点动力的员工休息室，凯文懒洋洋地瘫在懒人沙发上，（第一人称视角）他向你递过来一罐冰镇可乐，脸上挂着“同道中人”的友好笑容。
+
+English: Anime style, in the Singularity Dynamics breakroom, Kevin is slouched comfortably on a beanbag chair, holding out a can of ice-cold cola towards you (first-person view), a friendly, knowing grin on his face. (Violet Evergarden aesthetic, relaxed, welcoming, soft indoor lighting)
+
+八卦情报站 (Gossip Station)
+
+中文: 动漫画风，凯文（通过通讯器）神神秘秘地给你看他手机上的“内幕消息”（比如林博士和Zoe在项目上又怼起来了），他一脸“快夸我”的八卦表情。
+
+English: Anime style, Kevin (via communicator) conspiratorially shows you some 'inside info' on his phone (like Dr. Lin and Zoe are fighting over a project again), making a "praise me for this gossip" face. (Violet Evergarden aesthetic, humorous, warm light from the phone)
+
+友情护盾 (The Friend Shield)
+
+中文: 动漫画风，（在一次聚餐或休息时），凯文察觉到你的试探，他夸张地做了个“打住”的手势，然后笑着拍了拍你的肩膀：“打住打住！咱俩这接口不兼容！...不说了，晚上开黑吗？” 他的笑容真诚而坚定。
+
+English: Anime style, (during a break or meal), Kevin senses your probing. He makes an exaggerated "stop" gesture, then claps you on the shoulder, laughing, "Whoa there! Our interfaces aren't compatible! ...Anyway, you on for games tonight?" His smile is sincere and firm. (Violet Evergarden aesthetic, platonic warmth, friendly gesture)
