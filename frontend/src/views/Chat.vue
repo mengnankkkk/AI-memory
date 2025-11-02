@@ -7,6 +7,7 @@ import { useWebSocketChat } from '@/services/websocket'
 import RomancePanel from '@/components/RomancePanel.vue'
 import CompanionAvatar from '@/components/CompanionAvatar.vue'
 import EventCard from '@/components/EventCard.vue'
+import ImageGallerySidebar from '@/components/ImageGallerySidebar.vue'
 import type { Companion, ChatMessage } from '@/types'
 import api from '@/services/auth'
 import { romanceApi } from '@/services/romance'
@@ -432,6 +433,15 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="h-screen flex bg-gradient-to-b from-pink-50 to-white">
+    <!-- 左侧图片收集侧边栏 -->
+    <ImageGallerySidebar
+      v-if="companion"
+      :companion-id="companionId"
+      :companion-name="companion.name"
+      :current-level="romanceLevel || 'stranger'"
+      :affinity="affinityScore || 0"
+    />
+
     <!-- 主聊天区域 -->
     <div class="flex-1 flex flex-col">
       <!-- 顶部栏 -->

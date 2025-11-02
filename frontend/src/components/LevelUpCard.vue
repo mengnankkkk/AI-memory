@@ -15,16 +15,11 @@
           </div>
         </div>
 
-        <!-- 人物立绘 -->
-        <div class="character-portrait">
-          <div class="portrait-frame">
-            <img
-              :src="characterImage"
-              :alt="companionName"
-              class="portrait-image"
-              @error="handleImageError"
-            />
-            <div class="portrait-glow"></div>
+        <!-- 大型等级图标 -->
+        <div class="level-icon-display">
+          <div class="icon-container">
+            <div class="level-emoji">{{ newLevelConfig.icon }}</div>
+            <div class="icon-glow"></div>
           </div>
         </div>
 
@@ -95,7 +90,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { getLevelConfig } from '@/config/affinity-config'
 
 interface Props {
@@ -111,34 +106,6 @@ const props = defineProps<Props>()
 const emit = defineEmits<{
   close: []
 }>()
-
-// 角色立绘映射（ID -> 文件夹名）
-const characterFolderMap: Record<number, string> = {
-  1: 'nagi',      // 娜姬
-  2: 'xuejian',   // 雪见
-  3: 'zoe',       // Zoe
-  4: 'shiyu',     // 诗雨
-  5: 'linzixi',   // 林子晞
-  6: 'kevin'      // Kevin
-}
-
-// 等级到立绘的映射
-const levelImageMap: Record<string, string> = {
-  'stranger': 'C1-0.jpg',         // 陌生人
-  'acquaintance': 'C1-1.jpg',     // 相识
-  'friend': 'C2-0.jpg',           // 朋友
-  'close_friend': 'C2-1.jpg',     // 密友
-  'special': 'C3-0.jpg',          // 特别关系
-  'romantic': 'C3-1.jpg',         // 暧昧
-  'lover': 'C4-0.jpg'             // 恋人
-}
-
-// 计算角色立绘路径
-const characterImage = computed(() => {
-  const folder = characterFolderMap[props.companionId] || 'nagi'
-  const imageFile = levelImageMap[props.newLevel] || 'C1-0.jpg'
-  return `/img/${folder}/${imageFile}`
-})
 
 // 等级配置
 const oldLevelConfig = computed(() => getLevelConfig(props.oldLevel))
@@ -179,12 +146,6 @@ const unlockedFeatures = computed(() => {
 
 const close = () => {
   emit('close')
-}
-
-const handleImageError = (e: Event) => {
-  // 图片加载失败时使用默认图片
-  const target = e.target as HTMLImageElement
-  target.src = '/img/nagi/C1-0.jpg'
 }
 
 // 光线样式
@@ -352,72 +313,65 @@ const getHeartStyle = (index: number) => {
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
-/* 人物立绘 */
-.character-portrait {
-  padding: 32px;
+/* 等级图标展示 */
+.level-icon-display {
+  padding: 48px 32px;
   display: flex;
   justify-content: center;
+  align-items: center;
 }
 
-.portrait-frame {
+.icon-container {
   position: relative;
-  width: 100%;
-  max-width: 400px;
-  aspect-ratio: 3 / 4;
-  border-radius: 20px;
-  overflow: hidden;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  animation: portraitReveal 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.5s backwards;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: iconReveal 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.5s backwards;
 }
 
-@keyframes portraitReveal {
+.level-emoji {
+  font-size: 120px;
+  filter: drop-shadow(0 8px 32px rgba(0, 0, 0, 0.2));
+  animation: emojiFloat 3s ease-in-out infinite;
+}
+
+@keyframes iconReveal {
   from {
     opacity: 0;
-    transform: scale(0.8) translateY(50px);
+    transform: scale(0.3) rotate(-180deg);
   }
   to {
     opacity: 1;
-    transform: scale(1) translateY(0);
+    transform: scale(1) rotate(0deg);
   }
 }
 
-.portrait-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center;
-  animation: imageZoom 20s ease-in-out infinite;
-}
-
-@keyframes imageZoom {
+@keyframes emojiFloat {
   0%, 100% {
-    transform: scale(1);
+    transform: translateY(0) scale(1);
   }
   50% {
-    transform: scale(1.05);
+    transform: translateY(-20px) scale(1.1);
   }
 }
 
-.portrait-glow {
+.icon-glow {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg,
-    rgba(255, 105, 180, 0.2) 0%,
-    transparent 50%,
-    rgba(147, 51, 234, 0.2) 100%);
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(236, 72, 153, 0.3) 0%, transparent 70%);
+  animation: glowPulse 2s ease-in-out infinite;
   pointer-events: none;
-  animation: glowPulse 3s ease-in-out infinite;
 }
 
 @keyframes glowPulse {
   0%, 100% {
     opacity: 0.5;
+    transform: scale(1);
   }
   50% {
-    opacity: 0.8;
+    opacity: 1;
+    transform: scale(1.2);
   }
 }
 
@@ -733,15 +687,15 @@ const getHeartStyle = (index: number) => {
   }
 
   .level-header,
-  .character-portrait,
+  .level-icon-display,
   .level-info,
   .unlocked-features {
     padding-left: 24px;
     padding-right: 24px;
   }
 
-  .portrait-frame {
-    max-width: 300px;
+  .level-emoji {
+    font-size: 80px;
   }
 
   .badge-text {
