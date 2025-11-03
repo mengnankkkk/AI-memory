@@ -1,0 +1,59 @@
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Claude
+.claude/
+.spec-workflow/
+
+# 文档
+docs/
+*.md
+README.md
+
+# 测试
+tests/
+.pytest_cache/
+
+# Python
+__pycache__/
+*.py[cod]
+.Python
+*.egg-info/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# 构建产物
+dist/
+build/
+
+# 数据和日志
+*.log
+*.db
+*.db-journal
+chroma_db/
+
+# 临时文件
+.DS_Store
+*.tmp
+
+# 脚本
+scripts/
+*.bat
+*.sh
+
+# PE 目录
+PE/
+
+# MCP 目录
+mcp/

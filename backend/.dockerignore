@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# 虚拟环境
+venv/
+.venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 测试
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 临时文件
+*.log
+*.tmp
+.DS_Store
+
+# Git
+.git/
+.gitignore
+
+# Claude
+.claude/
+
+# 数据库和数据文件（运行时生成）
+*.db
+*.db-journal
+chroma_db/
+
+# 脚本文件
+start.bat
+start.sh
+start_fixed.bat
+*.html
+
+# 测试文件
+tests/
+websocket_test.html
+check_personality.py
+clean_db.py
+init_*.py
+migrate_db.py
+rebuild_database.py
