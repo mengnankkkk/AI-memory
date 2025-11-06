@@ -5,10 +5,15 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # 安装系统依赖
-RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
-    && rm -rf /var/lib/apt/lists/*
+RUN set -eux; \
+    rm -f /etc/apt/sources.list.d/*; \
+    echo "deb http://mirrors.aliyun.com/debian/ trixie main contrib non-free non-free-firmware" > /etc/apt/sources.list; \
+    echo "deb http://mirrors.aliyun.com/debian/ trixie-updates main contrib non-free non-free-firmware" >> /etc/apt/sources.list; \
+    echo "deb http://mirrors.aliyun.com/debian-security trixie-security main contrib non-free non-free-firmware" >> /etc/apt/sources.list; \
+    apt-get clean; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends gcc g++ libffi-dev libssl-dev libc6-dev; \
+    rm -rf /var/lib/apt/lists/*
 
 # 复制依赖文件
 COPY requirements.txt .

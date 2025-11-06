@@ -28,10 +28,19 @@ export const useWebSocketChat = () => {
   // 连接到WebSocket服务器
   const connect = () => {
     if (socket.value?.connected) return
-    
+
     isConnecting.value = true
-    
-    socket.value = io('http://localhost:8000', {
+
+    // 智能检测运行环境
+    // 开发环境：Vite dev server 运行在 5173 端口
+    // 生产环境：Nginx 运行在 80/443 端口，通过代理转发到后端
+    const isDevelopment = window.location.port === '5173' || (window.location.hostname === 'localhost' && import.meta.env.DEV)
+
+    const socketUrl = isDevelopment
+      ? 'http://localhost:8000'  // 开发环境直连后端
+      : window.location.origin    // 生产环境通过Nginx代理（Nginx会将/socket.io/代理到backend:8000）
+
+    socket.value = io(socketUrl, {
       transports: ['websocket', 'polling'],
       timeout: 10000,
       forceNew: true,

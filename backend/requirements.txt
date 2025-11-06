@@ -17,3 +17,4 @@ python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 bcrypt==4.1.2
 chromadb==0.4.24
+numpy==1.26.4
