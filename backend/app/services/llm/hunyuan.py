@@ -2,6 +2,7 @@
 腾讯混元大模型服务实现
 使用腾讯云 API
 """
+import asyncio
 import json
 import hashlib
 import hmac
@@ -123,8 +124,9 @@ class HunyuanService(BaseLLMService):
                 "X-TC-Region": self.region
             }
 
-            # 发送请求
-            response = requests.post(
+            # 发送请求（使用 asyncio.to_thread 避免阻塞事件循环）
+            response = await asyncio.to_thread(
+                requests.post,
                 self.endpoint,
                 headers=headers,
                 data=payload_json,

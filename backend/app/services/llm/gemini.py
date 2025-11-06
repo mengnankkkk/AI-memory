@@ -2,6 +2,7 @@
 Gemini LLM服务实现
 使用Google Generative AI API
 """
+import asyncio
 from typing import List, Dict, Optional
 import google.generativeai as genai
 from app.services.llm.base import BaseLLMService
@@ -72,8 +73,9 @@ class GeminiService(BaseLLMService):
                 top_k=40,
             )
 
-            # 调用Gemini API
-            response = self.model.generate_content(
+            # 调用Gemini API（使用 asyncio.to_thread 避免阻塞事件循环）
+            response = await asyncio.to_thread(
+                self.model.generate_content,
                 gemini_messages,
                 generation_config=generation_config,
                 safety_settings={

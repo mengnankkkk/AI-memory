@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = 'allow'  # 允许额外的环境变量（如 ChromaDB 遥测开关）
 
     @property
     def allowed_origins_list(self) -> List[str]:

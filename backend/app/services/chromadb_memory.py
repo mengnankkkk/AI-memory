@@ -41,8 +41,15 @@ class ChromaMemorySystem:
             raise RuntimeError("ChromaDB未安装，请运行 pip install chromadb")
 
         try:
-            # 创建持久化客户端
-            self.client = chromadb.PersistentClient(path=persist_directory)
+            # 创建持久化客户端（显式禁用遥测避免 PostHog 阻塞）
+            from chromadb.config import Settings
+            self.client = chromadb.PersistentClient(
+                path=persist_directory,
+                settings=Settings(
+                    anonymized_telemetry=False,
+                    allow_reset=True
+                )
+            )
 
             # 获取或创建集合
             self.collection = self.client.get_or_create_collection(

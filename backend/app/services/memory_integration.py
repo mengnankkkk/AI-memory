@@ -466,10 +466,18 @@ class MilvusMemorySystem(MemorySystemInterface):
 # 方案3: 使用ChromaDB (本地向量数据库)
 
 import chromadb
+from chromadb.config import Settings
 
 class ChromaMemorySystem(MemorySystemInterface):
     def __init__(self, persist_directory: str = "./chroma_db"):
-        self.client = chromadb.PersistentClient(path=persist_directory)
+        # 显式禁用遥测避免 PostHog 阻塞
+        self.client = chromadb.PersistentClient(
+            path=persist_directory,
+            settings=Settings(
+                anonymized_telemetry=False,
+                allow_reset=True
+            )
+        )
         self.collection = self.client.get_or_create_collection(
             name="conversation_memories"
         )

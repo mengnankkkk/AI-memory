@@ -35,6 +35,9 @@ services:
       - REDIS_URL=redis://redis:6379/0
       # Docker 环境允许所有 origins（前端通过 Nginx 代理）
       - ALLOWED_ORIGINS=*
+      # 禁用 ChromaDB 遥测
+      - ANONYMIZED_TELEMETRY=False
+      - CHROMA_TELEMETRY_IMPL=
     volumes:
       - ./backend/data:/app/data
       - ./backend/chroma_db:/app/chroma_db
